@@ -390,11 +390,21 @@ function guessSubject(r) {
     return 'BS'; 
 }
 
+function sortRecordsArray() {
+    records.sort((a, b) => {
+        // ID có dạng "1_0_Đại đội 1", split('_')[1] sẽ lấy ra số 0, 1, 2...
+        let idxA = parseInt((a.id || "").split('_')[1]);
+        let idxB = parseInt((b.id || "").split('_')[1]);
+        return (isNaN(idxA) ? 0 : idxA) - (isNaN(idxB) ? 0 : idxB);
+    });
+}
+
 async function loadData() {
     const { data, error } = await dbClient.from('bang_diem').select('*'); 
     if (error) { console.error('Lỗi lấy data:', error); return; }
     
-    records = (data || []).sort((a, b) => Number(a.id) - Number(b.id));
+    records = data || []; 
+    sortRecordsArray(); // CHÈN HÀM SẮP XẾP VÀO ĐÂY
     
     let sortedForLogs = [...records].sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0)).slice(0, 10);
     recentLogs = sortedForLogs.map(r => ({
@@ -403,13 +413,14 @@ async function loadData() {
 
     refreshAll();
 }
-
 dbClient.channel('tv-channel')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bang_diem' }, payload => {
         
         if (payload.eventType === 'INSERT') {
             records.push(payload.new);
-            records.sort((a, b) => Number(a.id) - Number(b.id)); 
+            
+            sortRecordsArray(); // Đã thay bằng hàm sắp xếp chuẩn
+            
             showToast(`Thêm mới: ${payload.new.ten}`);
             lastUpdatedId = payload.new.id;
             
@@ -447,9 +458,14 @@ dbClient.channel('tv-channel')
                     recentLogs = uniqueLogs.slice(0, 10);
                 }
                 records[index] = payload.new; 
+                
+                sortRecordsArray(); // Ép sắp xếp lại ngay khi có người được cập nhật điểm
+                
             } else {
                 records.push(payload.new);
-                records.sort((a, b) => Number(a.id) - Number(b.id));
+                
+                sortRecordsArray(); // Đã thay bằng hàm sắp xếp chuẩn
+                
                 lastUpdatedId = payload.new.id;
                 
                 recentLogs.unshift({ rec: payload.new, subject: changedSubj, time: payload.new.updatedAt || Date.now() });
