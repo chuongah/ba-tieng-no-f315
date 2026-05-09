@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRỰC TIẾP: HỆ THỐNG QUẢN LÝ KIỂM TRA 3 TIẾNG NỔ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f8fafc; --bg2: #ffffff; --bg3: #f1f5f9; --border: #e2e8f0;    
+    --accent: #2563eb; --accent2: #059669; --accent3: #ea580c;   
+    --red: #ef4444; --gold: #f59e0b; --text: #1e293b; --text2: #64748b;     
+    --gioi: #10b981; --kha: #3b82f6; --dat: #f59e0b; --kdat: #ef4444;      
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body { 
+    background: var(--bg); color: var(--text); 
+    font-family: 'Segoe UI', system-ui, sans-serif; 
+    height: 100vh; overflow: hidden; margin: 0; 
+    display: flex; flex-direction: column; user-select: none;
+  }
+
+  /* SYSTEM UI TOAST */
+  #toast-container { position: fixed; top: 80px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 12px; }
+  .toast { 
+    padding: 14px 20px; border-radius: 8px; color: #fff; font-size: 14px; font-weight: 600; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; transform: translateX(50px); 
+    transition: all 0.3s ease; display: flex; align-items: center; gap: 10px; background: #1d4ed8;
+  }
+  .toast.show { opacity: 1; transform: translateX(0); }
+
+  /* HEADER STYLE QUÂN ĐỘI */
+  .header { 
+    flex-shrink: 0; background-color: #4b5320; 
+    background-image: linear-gradient(rgba(10, 15, 10, 0.7), rgba(10, 15, 10, 0.7)), 
+        radial-gradient(ellipse at center, #556b2f 30%, transparent 31%),
+        radial-gradient(ellipse at top left, #3e451b 40%, transparent 41%),
+        radial-gradient(ellipse at bottom right, #2f3511 40%, transparent 41%);
+    background-size: 80px 80px; background-position: 0 0, 40px 40px, 40px 0;
+    border-bottom: 3px solid #facc15; padding: 0; 
+  }
+
+  .header-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; }
+  .logo-area { display: flex; align-items: center; gap: 14px; }
+  .star-logo { 
+    width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; 
+    background: transparent; border-radius: 50%; overflow: hidden; 
+  }
+  .star-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .app-title h1 { font-size: 20px; font-weight: 800; color: #fde047; letter-spacing: 0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); text-transform: uppercase; }
+  
+  .badge { background: rgba(30, 41, 59, 0.8); border: 1px solid #475569; border-radius: 6px; padding: 6px 14px; font-size: 14px; color: #e2e8f0; font-weight: 500; }
+  .badge span { color: #4ade80; font-weight: 700; font-size: 16px; margin-left: 4px; }
+
+  /* LIVE INDICATOR */
+  .live-indicator { display: flex; align-items: center; gap: 8px; font-weight: bold; color: #34d399; background: rgba(0,0,0,0.4); padding: 6px 12px; border-radius: 20px; border: 1px solid #065f46; }
+  .dot { width: 10px; height: 10px; background: #34d399; border-radius: 50%; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  /* NAV (Top Menu) */
+  .nav { flex-shrink: 0; display: flex; background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 10; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 16px 20px; font-size: 15px; color: var(--text2); cursor: pointer; border-bottom: 3px solid transparent; font-weight: 600; transition: color 0.2s, background 0.2s; }
+  .nav-item:hover { color: var(--accent); background: var(--bg3); }
+  .nav-item.active { color: var(--accent); border-bottom-color: var(--accent); background: #eff6ff; font-weight: 700; }
+
+  /* LAYOUT */
+  .content { flex: 1; display: flex; overflow: hidden; }
+  .sidebar { width: 240px; min-width: 240px; background: var(--bg2); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px 0; }
+  .main { flex: 1; overflow-y: auto; padding: 24px; background: var(--bg); }
+
+  /* SIDEBAR */
+  .sidebar-section { padding: 8px 20px; font-size: 11px; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; margin-top: 10px; font-weight: 700; }
+  .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 12px 20px; font-size: 14px; cursor: pointer; color: var(--text); font-weight: 500; border-left: 3px solid transparent; transition: background 0.1s; }
+  .sidebar-item:hover { background: var(--bg3); }
+  .sidebar-item.active { background: #eff6ff; color: var(--accent); border-left-color: var(--accent); font-weight: 700; }
+  .count-badge { margin-left: auto; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; font-size: 11px; color: var(--text2); font-weight: 700; }
+
+  .page { display: none; animation: fadeIn 0.3s ease; }
+  .page.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* CHARTS & TABLES */
+  .charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
+  .chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; align-items: center; }
+  .chart-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 16px; }
+  .donut-wrap { position: relative; width: 140px; height: 140px; display: flex; justify-content: center; align-items: center; margin-bottom: 16px; }
+  .donut { width: 100%; height: 100%; border-radius: 50%; background: conic-gradient(#e2e8f0 0% 100%); transition: background 0.5s ease; }
+  .donut-hole { position: absolute; width: 100px; height: 100px; background: var(--bg2); border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+  .donut-hole span { font-size: 24px; font-weight: 800; color: var(--text); line-height: 1; }
+  
+  .bar-chart-wrap { display: flex; align-items: flex-end; gap: 12px; height: 100px; width: 100%; justify-content: center; margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 16px; }
+  .bar-col { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 35px; }
+  .bar-track { width: 100%; height: 70px; background: var(--bg3); border-radius: 4px 4px 0 0; display: flex; align-items: flex-end; position: relative; }
+  .bar-fill { width: 100%; border-radius: 4px 4px 0 0; transition: height 0.5s ease; }
+  .bar-val { font-size: 12px; font-weight: 800; color: var(--text); position: absolute; top: -18px; width: 100%; text-align: center; }
+  .bar-label { font-size: 11px; font-weight: 600; color: var(--text2); }
+
+  .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+  .table-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); background: #f8fafc; }
+  .table-title { font-size: 18px; font-weight: 700; color: var(--text); text-transform: uppercase; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead tr { background: #e2e8f0; position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 0 var(--border); }
+  th { padding: 14px 16px; text-align: left; color: #334155; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-weight: 500; font-size: 15px; }
+  
+  .td-center { text-align: center; }
+  .xl-pill { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; display: inline-block; text-align: center; }
+  .xl-gioi { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
+  .xl-kha { background: #dbeafe; color: #2563eb; border: 1px solid #bfdbfe; }
+  .xl-dat { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+  .xl-kdat { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+  .xl-empty { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+
+  /* Hiệu ứng nháy khi có cập nhật mới */
+  @keyframes highlightUpdate {
+      0% { background-color: #fef08a; }
+      100% { background-color: transparent; }
+  }
+  .row-updated { animation: highlightUpdate 3s ease-out; }
+
+  .section-title { font-size: 22px; font-weight: 800; display: flex; align-items: center; gap: 10px; color: var(--text); margin-bottom: 20px; }
+
+  /* CUSTOM SELECT FOR RANKING */
+  .custom-select { position: relative; display: inline-block; user-select: none; }
+  .custom-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg2); border: 2px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .custom-select-options { display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; background: var(--bg2); border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 9999; overflow: hidden; padding: 4px 0; }
+  .custom-select.open .custom-select-options { display: block; }
+  .custom-option { padding: 10px 14px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .custom-option:hover { background: #eff6ff; color: var(--accent); }
+  .custom-option.selected { background: #eff6ff; color: var(--accent); font-weight: 800; }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+</style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<div class="header">
+  <div class="header-top">
+    <div class="logo-area">
+      <div class="star-logo">
+        <img src="logo.png" alt="Logo">
+      </div>
+      <div class="app-title">
+        <h1>SƯ ĐOÀN BỘ BINH 315</h1>
+        <h1>Phần mềm quản lý kiểm tra 3 môn tiếng nổ CSM</h1>
+      </div>
+    </div>
+    <div style="display: flex; gap: 15px; align-items: center;">
+      <div class="badge">Tổng Quân Số: <span id="hdr-total">0</span></div>
+      <div class="live-indicator"><div class="dot"></div> DỮ LIỆU THỰC</div>
+    </div>
+  </div>
+</div>
+
+<div class="nav">
+  <div class="nav-item active" onclick="showPage('tong-hop')" data-page="tong-hop">📊 Tổng hợp Đơn vị</div>
+  <div class="nav-item" onclick="showPage('ban-sung')" data-page="ban-sung">Bắn súng TLAK</div>
+  <div class="nav-item" onclick="showPage('thuoc-no')" data-page="thuoc-no">Thuốc nổ</div>
+  <div class="nav-item" onclick="showPage('luu-dan')" data-page="luu-dan">Lựu đạn</div>
+  <div class="nav-item" onclick="showPage('xep-hang')" data-page="xep-hang" style="margin-left: auto;">🏆 Thống kê & Xếp hạng</div>
+  <div class="nav-item" onclick="showPage('quy-che')" data-page="quy-che">📋 Quy chế</div>
+</div>
+
+<div class="page" id="page-quy-che">
+      <div class="section-title">📋 Tiêu chuẩn đánh giá 3 tiếng nổ</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+        
+        <div class="table-wrap" style="margin:0;">
+          <div class="table-header"><div class="table-title">Bắn súng TLAK Bài 1</div></div>
+          <div style="padding:24px; font-size:16px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:16px; border-bottom:1px dashed var(--border); padding-bottom:12px;">
+                <span class="xl-pill xl-gioi" style="width:90px; font-size:15px;">Giỏi</span><span style="font-weight:700">Tổng ≥ 72 điểm</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:16px; border-bottom:1px dashed var(--border); padding-bottom:12px;">
+                <span class="xl-pill xl-kha" style="width:90px; font-size:15px;">Khá</span><span style="font-weight:700">59 ≤ Tổng ≤ 71 điểm</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:16px; border-bottom:1px dashed var(--border); padding-bottom:12px;">
+                <span class="xl-pill xl-dat" style="width:90px; font-size:15px;">Đạt</span><span style="font-weight:700">45 ≤ Tổng ≤ 58 điểm</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+                <span class="xl-pill xl-kdat" style="width:90px; font-size:15px;">K.Đạt</span><span style="font-weight:700">Tổng < 45 điểm</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="table-wrap" style="margin:0;">
+          <div class="table-header"><div class="table-title">Lựu đạn Bài 1</div></div>
+          <div style="padding:24px; font-size:16px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:16px; border-bottom:1px dashed var(--border); padding-bottom:12px;">
+                <span class="xl-pill xl-gioi" style="width:90px; font-size:15px;">Giỏi</span><span style="font-weight:700">Trúng vòng 2m</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:16px; border-bottom:1px dashed var(--border); padding-bottom:12px;">
+                <span class="xl-pill xl-kha" style="width:90px; font-size:15px;">Khá</span><span style="font-weight:700">Trúng vòng 3m</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:16px; border-bottom:1px dashed var(--border); padding-bottom:12px;">
+                <span class="xl-pill xl-dat" style="width:90px; font-size:15px;">Đạt</span><span style="font-weight:700">Trúng vòng 4m</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+                <span class="xl-pill xl-kdat" style="width:90px; font-size:15px;">K.Đạt</span><span style="font-weight:700">Không trúng</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-wrap" style="grid-column:span 2; margin:0;">
+          <div class="table-header"><div class="table-title">Thuốc nổ Bài 1</div></div>
+          <div style="padding:24px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px;">
+            <div>
+                <div style="font-weight:800; margin-bottom:12px; color:var(--text2); font-size: 16px; text-transform: uppercase;">Nội dung 1 (Vật cản)</div>
+                <div style="font-size:13px; color:var(--red); margin-bottom:12px;">* Bắt buộc thực hiện đúng thao tác TC</div>
+                <div style="font-weight:600; font-size:16px; line-height:2.2;">
+                    <span style="color:var(--gioi)">Giỏi:</span> Thời gian ≤ 12p<br>
+                    <span style="color:var(--kha)">Khá:</span> Thời gian ≤ 17p<br>
+                    <span style="color:var(--dat)">Đạt:</span> Thời gian ≤ 19p<br>
+                    <span style="color:var(--kdat)">K.Đạt:</span> > 19p hoặc Sai TC
+                </div>
+            </div>
+            <div>
+                <div style="font-weight:800; margin-bottom:12px; color:var(--text2); font-size: 16px; text-transform: uppercase;">Nội dung 2 (Kỹ thuật)</div>
+                <div style="font-weight:600; font-size:16px; line-height:2.2; margin-top: 31px;">
+                    <span style="color:var(--gioi)">Giỏi:</span> Đúng 3/3 Tiêu chuẩn<br>
+                    <span style="color:var(--kha)">Khá:</span> Đúng TC 1, 2 (Sai TC 3)<br>
+                    <span style="color:var(--dat)">Đạt:</span> Đúng TC 2, 3 (Sai TC 1)<br>
+                    <span style="color:var(--kdat)">K.Đạt:</span> Sai TC 2 hoặc Sai 1,3
+                </div>
+            </div>
+            <div style="border-left:2px solid var(--border); padding-left:24px;">
+                <div style="font-weight:800; margin-bottom:12px; color:var(--accent); font-size: 16px; text-transform: uppercase;">XẾP LOẠI TỔNG THUỐC NỔ</div>
+                <div style="font-weight:600; font-size:16px; line-height:2.2; margin-top: 31px;">
+                    <span style="color:var(--gioi)">Giỏi:</span> ND2 Giỏi + ND1 ≥ Khá<br>
+                    <span style="color:var(--kha)">Khá:</span> ND2 ≥ Khá + ND1 ≥ Đạt<br>
+                    <span style="color:var(--dat)">Đạt:</span> ND2 ≥ Đạt + ND1 ≥ Đạt<br>
+                    <span style="color:var(--kdat)">K.Đạt:</span> Có 1 ND Không đạt
+                </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="content">
+  <div class="sidebar">
+    <div class="sidebar-section">LỌC THEO ĐẦU MỐI</div>
+    <div class="sidebar-item active" id="sb-menu-all" onclick="filterDonVi('all')">🏠 Toàn đơn vị <span class="count-badge" id="sb-all">0</span></div>
+    <div id="sidebar-dynamic-units"></div>
+  </div>
+
+  <div class="main">
+
+    <div class="page active" id="page-tong-hop">
+      <div class="section-title"><span id="db-title-donvi">Biểu đồ Tổng hợp kết quả Toàn đơn vị</span></div>
+      
+      <div class="charts-grid">
+        <div class="chart-card">
+            <div class="chart-title">Bắn súng TLAK</div>
+            <div class="donut-wrap"><div class="donut" id="donut-bs"></div><div class="donut-hole" id="donut-bs-text"><span>0%</span></div></div>
+            <div class="bar-chart-wrap" id="bar-bs"></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">Thuốc nổ</div>
+            <div class="donut-wrap"><div class="donut" id="donut-tn"></div><div class="donut-hole" id="donut-tn-text"><span>0%</span></div></div>
+            <div class="bar-chart-wrap" id="bar-tn"></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">Lựu đạn</div>
+            <div class="donut-wrap"><div class="donut" id="donut-ld"></div><div class="donut-hole" id="donut-ld-text"><span>0%</span></div></div>
+            <div class="bar-chart-wrap" id="bar-ld"></div>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="display: none;">
+        <div class="table-header"><div class="table-title">10 Kết quả được cập nhật mới nhất</div></div>
+        <div style="overflow-x:auto;">
+          <table id="main-table">
+            <thead>
+              <tr>
+                <th style="width:40px;">TT</th>
+                <th style="width:220px;">Họ và tên</th>
+                <th style="width:120px;">Cấp bậc</th>
+                <th>Đơn vị</th>
+                <th style="width:140px;" class="td-center">Môn cập nhật</th>
+                <th class="td-center" colspan="3">Chi tiết Kết quả</th>
+              </tr>
+            </thead>
+            <tbody id="main-tbody">
+              <tr><td colspan="8" style="text-align:center;color:var(--text2);padding:40px;font-style:italic;">Đang tải dữ liệu từ máy chủ...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-ban-sung">
+      <div class="section-title">Danh sách Điểm Bắn súng TLAK bài 1</div>
+      <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:40px;">TT</th><th style="width:250px;">Họ tên</th><th>CB/CV</th><th>Đơn vị</th><th class="td-center">Tổng Điểm</th><th class="td-center">Xếp loại</th></tr></thead>
+          <tbody id="bs-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="page" id="page-thuoc-no">
+      <div class="section-title">Danh sách Điểm Thuốc nổ bài 1</div>
+      <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:40px;">TT</th><th style="width:250px;">Họ tên</th><th>CB/CV</th><th>Đơn vị</th><th class="td-center">XL ND1</th><th class="td-center">XL ND2</th><th class="td-center">XL Tổng</th></tr></thead>
+          <tbody id="tn-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="page" id="page-luu-dan">
+      <div class="section-title">Danh sách Điểm Lựu đạn bài 1</div>
+      <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:40px;">TT</th><th style="width:250px;">Họ tên</th><th>CB/CV</th><th>Đơn vị</th><th class="td-center">Kết quả vòng</th><th class="td-center">Xếp loại</th></tr></thead>
+          <tbody id="ld-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="page" id="page-xep-hang">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+        <div class="section-title" style="margin:0;">🏆 Thống kê & Xếp hạng Từng Môn</div>
+        <div style="display:flex;gap:12px;">
+            <div class="custom-select" id="cs-rank-subject" style="width:220px;" data-value="BS">
+                <div class="custom-select-trigger" onclick="toggleCustomSelect('cs-rank-subject')">
+                    <span class="cs-label">Bắn súng TLAK</span><span class="cs-arrow">▼</span>
+                </div>
+                <div class="custom-select-options">
+                    <div class="custom-option selected" data-value="BS" onclick="selectCustomOption('cs-rank-subject','BS',this); updateRankOptions();">Bắn súng TLAK</div>
+                    <div class="custom-option" data-value="TN" onclick="selectCustomOption('cs-rank-subject','TN',this); updateRankOptions();">Thuốc Nổ</div>
+                    <div class="custom-option" data-value="LD" onclick="selectCustomOption('cs-rank-subject','LD',this); updateRankOptions();">Lựu Đạn</div>
+                </div>
+            </div>
+            <div class="custom-select" id="cs-rank-type" style="width:280px;" data-value="ca_nhan">
+                <div class="custom-select-trigger" onclick="toggleCustomSelect('cs-rank-type')">
+                    <span class="cs-label">👤 Bảng xếp hạng Cá nhân</span><span class="cs-arrow">▼</span>
+                </div>
+                <div class="custom-select-options" id="cs-rank-type-options"></div>
+            </div>
+        </div>
+      </div>
+      <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
+          <table id="rank-table">
+            <thead id="xh-thead"></thead>
+            <tbody id="xh-tbody"></tbody>
+          </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ===== CẤU HÌNH SUPABASE =====
+const SUPABASE_URL = 'https://uhgeatzoljngaqbvkwuo.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_XK6cYjdiFocWA4LohdrsCQ_9u1S3Y9f';
+const dbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let records = [];
+let recentLogs = []; // Lưu lại lịch sử cập nhật
+let currentFilter = { dv: 'all' };
+let lastUpdatedId = null; 
+
+function showToast(msg) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast`;
+    toast.innerHTML = `<span>⚡</span> <span>${msg}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+function guessSubject(r) {
+    if (r.xlTN && r.xlTN !== 'Chưa kiểm tra') return 'TN';
+    if (r.xlLD && r.xlLD !== 'Chưa kiểm tra') return 'LD';
+    if (r.xlBS && r.xlBS !== 'Chưa kiểm tra') return 'BS';
+    return 'BS'; 
+}
+
+async function loadData() {
+    const { data, error } = await dbClient.from('bang_diem').select('*'); 
+    if (error) { console.error('Lỗi lấy data:', error); return; }
+    
+    records = (data || []).sort((a, b) => Number(a.id) - Number(b.id));
+    
+    let sortedForLogs = [...records].sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0)).slice(0, 10);
+    recentLogs = sortedForLogs.map(r => ({
+        rec: r, subject: guessSubject(r), time: r.updatedAt || 0
+    }));
+
+    refreshAll();
+}
+
+dbClient.channel('tv-channel')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bang_diem' }, payload => {
+        
+        if (payload.eventType === 'INSERT') {
+            records.push(payload.new);
+            records.sort((a, b) => Number(a.id) - Number(b.id)); 
+            showToast(`Thêm mới: ${payload.new.ten}`);
+            lastUpdatedId = payload.new.id;
+            
+            let changedSubj = guessSubject(payload.new);
+            recentLogs.unshift({ rec: payload.new, subject: changedSubj, time: payload.new.updatedAt || Date.now() });
+            
+            // Xóa trùng người
+            let uniqueLogs = []; let seenIds = new Set();
+            for (let log of recentLogs) {
+                if (!seenIds.has(log.rec.id)) { seenIds.add(log.rec.id); uniqueLogs.push(log); }
+            }
+            recentLogs = uniqueLogs.slice(0, 10);
+        } 
+        else if (payload.eventType === 'UPDATE') {
+            let index = records.findIndex(r => r.id === payload.new.id);
+            let changedSubj = guessSubject(payload.new);
+            
+            if (index !== -1) {
+                let oldRec = records[index];
+                let isRealUpdate = oldRec.updatedAt !== payload.new.updatedAt;
+                
+                if (isRealUpdate) {
+                    if (oldRec.xlTN !== payload.new.xlTN || oldRec.tnNd1Tc1 !== payload.new.tnNd1Tc1 || oldRec.tnNd1Tg !== payload.new.tnNd1Tg || oldRec.tnNd2Tc1 !== payload.new.tnNd2Tc1) changedSubj = 'TN';
+                    else if (oldRec.xlLD !== payload.new.xlLD || oldRec.ldV1 !== payload.new.ldV1 || oldRec.ldV2 !== payload.new.ldV2 || oldRec.ldV3 !== payload.new.ldV3) changedSubj = 'LD';
+                    else if (oldRec.xlBS !== payload.new.xlBS || oldRec.bsTong !== payload.new.bsTong) changedSubj = 'BS';
+                    
+                    showToast(`Vừa cập nhật điểm cho: ${payload.new.ten}`);
+                    lastUpdatedId = payload.new.id;
+                    
+                    recentLogs.unshift({ rec: payload.new, subject: changedSubj, time: payload.new.updatedAt || Date.now() });
+                    let uniqueLogs = []; let seenIds = new Set();
+                    for (let log of recentLogs) {
+                        if (!seenIds.has(log.rec.id)) { seenIds.add(log.rec.id); uniqueLogs.push(log); }
+                    }
+                    recentLogs = uniqueLogs.slice(0, 10);
+                }
+                records[index] = payload.new; 
+            } else {
+                records.push(payload.new);
+                records.sort((a, b) => Number(a.id) - Number(b.id));
+                lastUpdatedId = payload.new.id;
+                
+                recentLogs.unshift({ rec: payload.new, subject: changedSubj, time: payload.new.updatedAt || Date.now() });
+                let uniqueLogs = []; let seenIds = new Set();
+                for (let log of recentLogs) {
+                    if (!seenIds.has(log.rec.id)) { seenIds.add(log.rec.id); uniqueLogs.push(log); }
+                }
+                recentLogs = uniqueLogs.slice(0, 10);
+            }
+        } 
+        else if (payload.eventType === 'DELETE') {
+            records = records.filter(r => r.id !== payload.old.id);
+            recentLogs = recentLogs.filter(log => log.rec.id !== payload.old.id);
+        }
+        
+        refreshAll();
+        
+        if (lastUpdatedId) {
+            setTimeout(() => {
+                lastUpdatedId = null;
+                renderMainTable(); renderBanSung(); renderThuocNo(); renderLuuDan();
+            }, 3000);
+        }
+    })
+    .subscribe();
+
+loadData();
+
+
+// ================== CÁC HÀM UI & RENDER ==================
+
+function updateSidebarUnits() {
+    let units = {};
+    records.forEach(r => {
+        if (r.dv) {
+            let parts = r.dv.split('/');
+            let d_level = parts[0] ? parts[0].trim().toUpperCase() : ''; 
+            let c_level = parts[1] ? parts[1].trim() : '';
+            if (d_level) {
+                units[d_level] = (units[d_level] || 0) + 1;
+                if (c_level) {
+                    let d_c = d_level + '/' + c_level;
+                    units[d_c] = (units[d_c] || 0) + 1;
+                }
+            }
+        }
+    });
+    
+    let html = '';
+    let keys = Object.keys(units).sort();
+    keys.forEach(u => {
+        let act = (currentFilter.dv === u) ? 'active' : '';
+        let isC = u.includes('/');
+        let display = isC ? '↳ ' + u.split('/')[1] : '⬢ ' + u;
+        let pad = isC ? 'padding-left: 40px;' : '';
+        let safeId = u.replace(/\//g, '-').replace(/\s+/g, '');
+        html += `<div class="sidebar-item ${act}" style="${pad}" onclick="filterDonVi('${u}')" id="sb-menu-${safeId}">${display} <span class="count-badge">${units[u]}</span></div>`;
+    });
+    document.getElementById('sidebar-dynamic-units').innerHTML = html;
+    document.getElementById('sb-all').textContent = records.length;
+}
+
+function filterDonVi(dv) {
+    currentFilter.dv = dv;
+    document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+    if(dv === 'all') {
+        document.getElementById('sb-menu-all').classList.add('active');
+        document.getElementById('db-title-donvi').textContent = 'Biểu đồ Tổng hợp kết quả Toàn đơn vị';
+    } else {
+        let safeId = dv.replace(/\//g, '-').replace(/\s+/g, '');
+        let el = document.getElementById('sb-menu-' + safeId);
+        if(el) el.classList.add('active');
+        document.getElementById('db-title-donvi').textContent = 'Biểu đồ Tổng hợp kết quả ' + dv;
+    }
+    refreshAll();
+}
+
+function getFilteredRecords() {
+    if (currentFilter.dv === 'all') return records;
+    return records.filter(r => {
+        let parts = (r.dv || '').split('/');
+        let d_level = parts[0] ? parts[0].trim().toUpperCase() : '';
+        let c_level = parts[1] ? parts[1].trim() : '';
+        let val = currentFilter.dv;
+        if (val.includes('/')) {
+            return (d_level + '/' + c_level) === val;
+        } else {
+            return d_level === val;
+        }
+    });
+}
+
+function xlClass(xl){ return {'Giỏi':'xl-gioi','Khá':'xl-kha','Đạt':'xl-dat','Không đạt':'xl-kdat'}[xl]||'xl-empty'; }
+function xlPill(xl){ return (!xl || xl==='Chưa kiểm tra') ? `<span class="xl-pill xl-empty">Chưa KT</span>` : `<span class="xl-pill ${xlClass(xl)}">${xl}</span>`;}
+
+function refreshAll() {
+  updateSidebarUnits(); drawDashboards();
+  renderMainTable(); renderBanSung(); renderThuocNo(); renderLuuDan();
+  if (document.getElementById('page-xep-hang').classList.contains('active')) renderXepHang();
+  document.getElementById('hdr-total').textContent = records.length;
+  updateRankOptions(); 
+}
+
+function drawDashboards() {
+    let fRec = getFilteredRecords();
+    drawSingleChart('bs', 'xlBS', fRec);
+    drawSingleChart('tn', 'xlTN', fRec);
+    drawSingleChart('ld', 'xlLD', fRec);
+}
+
+function drawSingleChart(prefix, key, arr) {
+    let valid = arr.filter(r => r[key] && r[key] !== 'Chưa kiểm tra');
+    let n = valid.length;
+    let g = valid.filter(r=>r[key]==='Giỏi').length, k = valid.filter(r=>r[key]==='Khá').length;
+    let d = valid.filter(r=>r[key]==='Đạt').length, kd = valid.filter(r=>r[key]==='Không đạt').length;
+    
+    let donutEl = document.getElementById(`donut-${prefix}`); let textEl = document.getElementById(`donut-${prefix}-text`);
+    if(n === 0) {
+        donutEl.style.background = `conic-gradient(#e2e8f0 0% 100%)`; textEl.innerHTML = `<span>0%</span>`;
+        document.getElementById(`bar-${prefix}`).innerHTML = '<div style="font-size:12px; color:var(--text2); padding-bottom:10px;">Chưa có dữ liệu</div>'; return;
+    }
+    let pG = (g/n)*100, pK = (k/n)*100, pD = (d/n)*100; let c1 = pG, c2 = c1+pK, c3 = c2+pD;
+    
+    donutEl.style.background = `conic-gradient(var(--gioi) 0% ${c1}%, var(--kha) ${c1}% ${c2}%, var(--dat) ${c2}% ${c3}%, var(--kdat) ${c3}% 100%)`;
+    let dyc = Math.round(pG+pK+pD); textEl.innerHTML = `<span style="color:${dyc>=70?'var(--gioi)':'var(--kdat)'}">${dyc}%</span>`;
+    
+    let maxVal = Math.max(g, k, d, kd, 1);
+    let html = `
+        <div class="bar-col"><div class="bar-track"><div class="bar-fill" style="background:var(--gioi); height:${(g/maxVal)*100}%;"><div class="bar-val">${g}</div></div></div><div class="bar-label">Giỏi</div></div>
+        <div class="bar-col"><div class="bar-track"><div class="bar-fill" style="background:var(--kha); height:${(k/maxVal)*100}%;"><div class="bar-val">${k}</div></div></div><div class="bar-label">Khá</div></div>
+        <div class="bar-col"><div class="bar-track"><div class="bar-fill" style="background:var(--dat); height:${(d/maxVal)*100}%;"><div class="bar-val">${d}</div></div></div><div class="bar-label">Đạt</div></div>
+        <div class="bar-col"><div class="bar-track"><div class="bar-fill" style="background:var(--kdat); height:${(kd/maxVal)*100}%;"><div class="bar-val">${kd}</div></div></div><div class="bar-label">K.Đạt</div></div>
+    `;
+    document.getElementById(`bar-${prefix}`).innerHTML = html;
+}
+
+function renderMainTable() {
+  const tbody = document.getElementById('main-tbody'); 
+  let fRecords = getFilteredRecords();
+  
+  let filteredLogs = recentLogs.filter(log => fRecords.some(r => r.id === log.rec.id));
+  
+  if(!filteredLogs.length){
+      tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text2);font-style:italic;">Chưa có dữ liệu</td></tr>';
+      return;
+  }
+  
+  tbody.innerHTML = filteredLogs.map((log) => {
+      let r = log.rec;
+      let originIndex = records.findIndex(orig => orig.id === r.id);
+      let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
+      let trClass = r.id === lastUpdatedId ? 'row-updated' : '';
+
+      let cols = '';
+      if (log.subject === 'BS') {
+          cols = `<td class="td-center"><strong style="color:var(--accent); font-size:14px;">BẮN SÚNG</strong></td>
+                  <td class="td-center" style="width:120px;">Điểm: <strong style="font-size:16px;">${r.bsTong!=null?r.bsTong:'-'}</strong></td>
+                  <td class="td-center" colspan="2">XL: ${xlPill(r.xlBS)}</td>`;
+      } else if (log.subject === 'TN') {
+          cols = `<td class="td-center"><strong style="color:var(--gold); font-size:14px;">THUỐC NỔ</strong></td>
+                  <td class="td-center" style="width:110px;">ND1: ${xlPill(r.xlND1)}</td>
+                  <td class="td-center" style="width:110px;">ND2: ${xlPill(r.xlND2)}</td>
+                  <td class="td-center" style="width:110px;">Tổng: ${xlPill(r.xlTN)}</td>`;
+      } else {
+          cols = `<td class="td-center"><strong style="color:var(--accent3); font-size:14px;">LỰU ĐẠN</strong></td>
+                  <td class="td-center" colspan="3">Xếp loại: ${xlPill(r.xlLD)}</td>`;
+      }
+
+      return `<tr class="${trClass}">
+                <td>${originIndex + 1}</td>
+                <td><strong style="color:var(--text); font-size: 16px;">${r.ten}</strong></td>
+                <td>${r.cb||''}</td>
+                <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
+                ${cols}
+              </tr>`;
+  }).join('');
+}
+
+function renderBanSung(){ 
+    const t=document.getElementById('bs-tbody'); let fRec = getFilteredRecords();
+    if(!fRec.length){t.innerHTML='<tr><td colspan="6" class="td-center" style="padding:20px;">Chưa có dữ liệu</td></tr>';return;} 
+    
+    t.innerHTML=fRec.map((r) => {
+        let originIndex = records.findIndex(orig => orig.id === r.id);
+        let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
+        let diem = r.xlBS && r.xlBS !== 'Chưa kiểm tra' ? `<strong style="color:var(--accent); font-size:18px;">${r.bsTong}</strong>` : '—';
+        let trClass = r.id === lastUpdatedId ? 'row-updated' : '';
+        
+        return `<tr class="${trClass}"><td>${originIndex + 1}</td><td><strong style="font-size:16px;">${r.ten}</strong></td><td>${r.cb||''}</td><td style="font-size:13px; color:var(--text2);">${dvReversed}</td><td class="td-center">${diem}</td><td class="td-center">${xlPill(r.xlBS)}</td></tr>`;
+    }).join(''); 
+}
+
+function renderThuocNo(){ 
+    const t=document.getElementById('tn-tbody'); let fRec = getFilteredRecords();
+    if(!fRec.length){t.innerHTML='<tr><td colspan="7" class="td-center" style="padding:20px;">Chưa có dữ liệu</td></tr>';return;} 
+    
+    t.innerHTML=fRec.map((r) => {
+        let originIndex = records.findIndex(orig => orig.id === r.id);
+        let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
+        let trClass = r.id === lastUpdatedId ? 'row-updated' : '';
+        
+        return `<tr class="${trClass}"><td>${originIndex + 1}</td><td><strong style="font-size:16px;">${r.ten}</strong></td><td>${r.cb||''}</td><td style="font-size:13px; color:var(--text2);">${dvReversed}</td><td class="td-center">${xlPill(r.xlND1)}</td><td class="td-center">${xlPill(r.xlND2)}</td><td class="td-center">${xlPill(r.xlTN)}</td></tr>`;
+    }).join(''); 
+}
+
+function renderLuuDan(){ 
+    const t=document.getElementById('ld-tbody'); let fRec = getFilteredRecords();
+    if(!fRec.length){t.innerHTML='<tr><td colspan="6" class="td-center" style="padding:20px;">Chưa có dữ liệu</td></tr>';return;} 
+    
+    t.innerHTML=fRec.map((r) => {
+        let originIndex = records.findIndex(orig => orig.id === r.id);
+        let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
+        let kq = '—';
+        if (r.xlLD && r.xlLD !== 'Chưa kiểm tra') {
+            kq = 'Trượt';
+            if(r.ldV1) kq = 'Vòng 1 (2m)'; else if(r.ldV2) kq = 'Vòng 2 (3m)'; else if(r.ldV3) kq = 'Vòng 3 (4m)';
+        }
+        let kqDisplay = kq === '—' ? kq : `<strong style="font-size:15px;">${kq}</strong>`;
+        let trClass = r.id === lastUpdatedId ? 'row-updated' : '';
+        
+        return `<tr class="${trClass}"><td>${originIndex + 1}</td><td><strong style="font-size:16px;">${r.ten}</strong></td><td>${r.cb||''}</td><td style="font-size:13px; color:var(--text2);">${dvReversed}</td><td class="td-center">${kqDisplay}</td><td class="td-center">${xlPill(r.xlLD)}</td></tr>`;
+    }).join(''); 
+}
+
+// ===== CUSTOM DROPDOWN HELPERS =====
+function toggleCustomSelect(id) {
+    let el = document.getElementById(id); let isOpen = el.classList.contains('open');
+    document.querySelectorAll('.custom-select.open').forEach(s => s.classList.remove('open'));
+    if (!isOpen) el.classList.add('open');
+}
+
+function selectCustomOption(selectId, value, optionEl) {
+    let el = document.getElementById(selectId); el.dataset.value = value;
+    el.querySelector('.cs-label').textContent = optionEl.textContent.trim();
+    el.querySelectorAll('.custom-option').forEach(o => o.classList.remove('selected'));
+    optionEl.classList.add('selected'); el.classList.remove('open');
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.custom-select')) document.querySelectorAll('.custom-select.open').forEach(s => s.classList.remove('open'));
+});
+
+// ===================================
+
+function updateRankOptions() {
+    let subj = document.getElementById('cs-rank-subject').dataset.value || 'BS';
+    let csType = document.getElementById('cs-rank-type');
+    let currentVal = csType.dataset.value || '';
+    
+    let options = [];
+    if (subj === 'BS') options.push({ value: 'ca_nhan', label: '👤 Bảng xếp hạng Cá nhân' });
+    options.push(
+        { value: 'a', label: '⬢ Tập thể: Cấp Tiểu đội' },
+        { value: 'b', label: '⬢ Tập thể: Cấp Trung đội' },
+        { value: 'c', label: '⬢ Tập thể: Cấp Đại đội' },
+        { value: 'd', label: '⬢ Tập thể: Cấp Tiểu đoàn' }
+    );
+
+    let newVal = currentVal;
+    if (subj !== 'BS' && currentVal === 'ca_nhan') newVal = 'a';
+    if (!options.find(o => o.value === newVal)) newVal = options[0].value;
+
+    let optionsContainer = document.getElementById('cs-rank-type-options');
+    optionsContainer.innerHTML = options.map(o => `<div class="custom-option${o.value === newVal ? ' selected' : ''}" data-value="${o.value}" onclick="selectCustomOption('cs-rank-type','${o.value}',this); renderXepHang();">${o.label}</div>`).join('');
+
+    let selectedOpt = options.find(o => o.value === newVal);
+    csType.dataset.value = newVal;
+    if (selectedOpt) csType.querySelector('.cs-label').textContent = selectedOpt.label;
+
+    renderXepHang();
+}
+
+function renderXepHang(){ 
+    const tHead=document.getElementById('xh-thead'); const tBody=document.getElementById('xh-tbody');
+    let fRec = getFilteredRecords();
+    let subj = document.getElementById('cs-rank-subject').dataset.value || 'BS'; 
+    let type = document.getElementById('cs-rank-type').dataset.value || 'ca_nhan'; 
+    let xlKey = subj === 'BS' ? 'xlBS' : subj === 'TN' ? 'xlTN' : 'xlLD';
+    let d = fRec.filter(r => r[xlKey] && r[xlKey] !== 'Chưa kiểm tra');
+
+    if(!d.length){ tHead.innerHTML=''; tBody.innerHTML='<tr><td colspan="6" class="td-center" style="padding:40px; color:var(--text2); font-style:italic;">Chưa có dữ liệu điểm này để xếp hạng</td></tr>'; return; } 
+
+    if (type === 'ca_nhan') {
+        tHead.innerHTML = `<tr><th style="width:60px;">Hạng</th><th style="width:250px;">Họ tên</th><th style="width:120px;">Cấp bậc</th><th>Đơn vị</th><th style="width:200px;" class="td-center">Điểm Thành tích</th><th class="td-center" style="width:140px;">Xếp loại</th></tr>`;
+        let sorted = [...d].sort((a,b) => b.bsTong - a.bsTong);
+        
+        tBody.innerHTML = sorted.map((r,i) => {
+            let pts = r.bsTong;
+            let dvRev = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
+            let color = r.xlBS === 'Giỏi' ? 'var(--gioi)' : r.xlBS === 'Khá' ? 'var(--kha)' : r.xlBS === 'Đạt' ? 'var(--dat)' : 'var(--kdat)';
+            
+            return `<tr>
+                <td><strong style="font-size:18px;">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong></td>
+                <td><strong style="color:var(--text); font-size: 16px;">${r.ten}</strong></td><td style="font-size:14px;">${r.cb||''}</td><td style="font-size:13px;color:var(--text2);">${dvRev}</td>
+                <td class="td-center"><strong style="color:${color}; font-size:18px;">${pts} đ</strong></td>
+                <td class="td-center">${xlPill(r.xlBS)}</td>
+            </tr>`;
+        }).join('');
+    } else {
+        tHead.innerHTML = `<tr><th>Hạng</th><th>Tên đơn vị</th><th class="td-center">Quân số</th><th style="width:200px;">Tỷ lệ Đạt Yêu Cầu</th><th style="width:300px;">Biểu đồ chi tiết (G-K-Đ-KĐ)</th></tr>`;
+        
+        let groups = {};
+        d.forEach(r => {
+            let parts = (r.dv || '').split('/'); 
+            let uName = "";
+            if(type==='d' && parts[0]) uName = parts[0];
+            else if(type==='c' && parts[1]) uName = parts[0]+'/'+parts[1];
+            else if(type==='b' && parts[2]) uName = parts[0]+'/'+parts[1]+'/'+parts[2];
+            else if(type==='a' && parts[3]) uName = parts.join('/');
+
+            if(!uName) return; 
+
+            if(!groups[uName]) groups[uName] = {name: uName, total:0, G:0, K:0, D:0, KD:0};
+            groups[uName].total++;
+            let xl = r[xlKey];
+            if(xl==='Giỏi') groups[uName].G++; else if(xl==='Khá') groups[uName].K++; else if(xl==='Đạt') groups[uName].D++; else groups[uName].KD++;
+        });
+        
+        let groupArr = Object.values(groups);
+        if(groupArr.length === 0) { tBody.innerHTML = '<tr><td colspan="5" class="td-center" style="font-style:italic;">Không có đơn vị cấp này trong danh sách</td></tr>'; return; }
+
+        groupArr.sort((a,b) => {
+            let pctA = (a.G + a.K + a.D) / a.total; let pctB = (b.G + b.K + b.D) / b.total;
+            if (pctB !== pctA) return pctB - pctA; 
+            let pGA = a.G / a.total; let pGB = b.G / b.total;
+            if (pGB !== pGA) return pGB - pGA; 
+            return (b.K / b.total) - (a.K / a.total); 
+        });
+
+        tBody.innerHTML = groupArr.map((g, i) => {
+            let pct = Math.round(((g.G + g.K + g.D) / g.total) * 100) || 0;
+            let revName = g.name.split('/').reverse().join(' / ');
+            let pG = Math.round(g.G/g.total*100) || 0, pK = Math.round(g.K/g.total*100) || 0, pD = Math.round(g.D/g.total*100) || 0, pKD = Math.round(g.KD/g.total*100) || 0;
+
+            return `<tr>
+                <td><strong style="font-size:18px;">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong></td>
+                <td><strong style="color:var(--accent); font-size:16px;">${revName}</strong></td>
+                <td class="td-center"><span style="background:var(--bg3); padding:6px 14px; border-radius:6px; font-weight:800; font-size:15px;">${g.total}</span></td>
+                <td><strong style="color:${pct>=70?'var(--gioi)':'var(--kdat)'}; font-size: 18px;">${pct}%</strong></td>
+                <td>
+                    <div style="display:flex; height: 18px; width: 100%; border-radius: 6px; overflow: hidden; margin-bottom: 8px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
+                        ${pG > 0 ? `<div style="width:${pG}%; background:var(--gioi);"></div>` : ''}
+                        ${pK > 0 ? `<div style="width:${pK}%; background:var(--kha);"></div>` : ''}
+                        ${pD > 0 ? `<div style="width:${pD}%; background:var(--dat);"></div>` : ''}
+                        ${pKD > 0 ? `<div style="width:${pKD}%; background:var(--kdat);"></div>` : ''}
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:800;">
+                        <span style="color:var(--gioi)">G: ${pG}%</span>
+                        <span style="color:var(--kha)">K: ${pK}%</span>
+                        <span style="color:var(--dat)">Đ: ${pD}%</span>
+                        <span style="color:var(--kdat)">KĐ: ${pKD}%</span>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+}
+
+function showPage(id){ 
+    document.querySelectorAll('.page, .nav-item').forEach(e=>e.classList.remove('active')); 
+    document.getElementById('page-'+id).classList.add('active'); 
+    document.querySelector(`[data-page="${id}"]`).classList.add('active'); 
+    if(id==='xep-hang') renderXepHang(); 
+    if(id==='ban-sung') renderBanSung();
+    if(id==='thuoc-no') renderThuocNo();
+    if(id==='luu-dan') renderLuuDan();
+}
+</script>
+</body>
+</html>
