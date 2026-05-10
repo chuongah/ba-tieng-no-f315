@@ -70,12 +70,23 @@
   .sidebar { width: 240px; min-width: 240px; background: var(--bg2); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px 0; }
   .main { flex: 1; overflow-y: auto; padding: 24px; background: var(--bg); }
 
-  /* SIDEBAR */
+  /* SIDEBAR MINIMAL TREEVIEW */
   .sidebar-section { padding: 8px 20px; font-size: 11px; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; margin-top: 10px; font-weight: 700; }
-  .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 12px 20px; font-size: 14px; cursor: pointer; color: var(--text); font-weight: 500; border-left: 3px solid transparent; transition: background 0.1s; }
+  
+  details > summary { list-style: none; outline: none; user-select: none; }
+  details > summary::-webkit-details-marker { display: none; } /* Ẩn mũi tên mặc định của trình duyệt */
+  
+  .tree-toggle {
+      display: inline-block; width: 16px; font-size: 10px; color: #64748b; 
+      transition: transform 0.2s ease; text-align: center; margin-right: 4px;
+  }
+  details[open] > summary .tree-toggle { transform: rotate(90deg); color: var(--accent); }
+  
+  .sidebar-item { display: flex; align-items: center; padding: 10px 20px; font-size: 13px; cursor: pointer; color: var(--text); font-weight: 500; border-left: 3px solid transparent; transition: background 0.1s; }
   .sidebar-item:hover { background: var(--bg3); }
   .sidebar-item.active { background: #eff6ff; color: var(--accent); border-left-color: var(--accent); font-weight: 700; }
-  .count-badge { margin-left: auto; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; font-size: 11px; color: var(--text2); font-weight: 700; }
+  
+  .count-badge { margin-left: auto; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; font-size: 11px; color: var(--text2); font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
   .page { display: none; animation: fadeIn 0.3s ease; }
   .page.active { display: block; }
@@ -100,10 +111,19 @@
   .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
   .table-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); background: #f8fafc; }
   .table-title { font-size: 18px; font-weight: 700; color: var(--text); text-transform: uppercase; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  thead tr { background: #e2e8f0; position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 0 var(--border); }
-  th { padding: 14px 16px; text-align: left; color: #334155; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
-  td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-weight: 500; font-size: 15px; }
+  
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+  thead { position: sticky; top: 0; z-index: 10; background: #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+  th { padding: 14px 16px; text-align: left; color: #334155; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-top: 1px solid #cbd5e1; background: #e2e8f0; background-clip: padding-box; }
+  th:first-child { border-left: 1px solid #cbd5e1; }
+  td { padding: 14px 16px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); vertical-align: middle; color: var(--text); font-weight: 500; font-size: 15px; }
+  td:first-child { border-left: 1px solid var(--border); }
+  tr:last-child td { border-bottom: 1px solid var(--border); }
+  
+  /* CSS thêm cho Sidebar Tree */
+  details > summary { list-style: none; outline: none; user-select: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details.sidebar-group { margin-top: 2px; }
   
   .td-center { text-align: center; }
   .xl-pill { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; display: inline-block; text-align: center; }
@@ -147,7 +167,7 @@
       <div class="star-logo">
         <img src="logo.png" alt="Logo">
       </div>
-      <div class="app-title">
+      <div class="app-title" style="text-align:center;">
         <h1>SƯ ĐOÀN BỘ BINH 315</h1>
         <h1>Phần mềm quản lý kiểm tra 3 môn tiếng nổ CSM</h1>
       </div>
@@ -161,6 +181,7 @@
 
 <div class="nav">
   <div class="nav-item active" onclick="showPage('tong-hop')" data-page="tong-hop">📊 Tổng hợp Đơn vị</div>
+  <div class="nav-item" onclick="showPage('ket-qua')" data-page="ket-qua">📝 Danh sách Kết quả</div>
   <div class="nav-item" onclick="showPage('ban-sung')" data-page="ban-sung">Bắn súng TLAK</div>
   <div class="nav-item" onclick="showPage('thuoc-no')" data-page="thuoc-no">Thuốc nổ</div>
   <div class="nav-item" onclick="showPage('luu-dan')" data-page="luu-dan">Lựu đạn</div>
@@ -274,25 +295,31 @@
         </div>
       </div>
 
-      <div class="table-wrap" style="display: none;">
-        <div class="table-header"><div class="table-title">10 Kết quả được cập nhật mới nhất</div></div>
-        <div style="overflow-x:auto;">
-          <table id="main-table">
-            <thead>
-              <tr>
-                <th style="width:40px;">TT</th>
-                <th style="width:220px;">Họ và tên</th>
-                <th style="width:120px;">Cấp bậc</th>
-                <th>Đơn vị</th>
-                <th style="width:140px;" class="td-center">Môn cập nhật</th>
-                <th class="td-center" colspan="3">Chi tiết Kết quả</th>
-              </tr>
-            </thead>
-            <tbody id="main-tbody">
-              <tr><td colspan="8" style="text-align:center;color:var(--text2);padding:40px;font-style:italic;">Đang tải dữ liệu từ máy chủ...</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="section-header" style="margin-top: 30px;">
+        <div class="section-title">📊 Kết quả kiểm tra của các Tiểu đoàn</div>
+      </div>
+      <div id="dashboard-battalions" style="display: flex; flex-direction: column; gap: 20px; margin-bottom: 30px;">
+          </div>
+    </div>
+
+    <div class="page" id="page-ket-qua">
+      <div class="section-title">📝 Danh sách Kết quả 3 môn tiếng nổ</div>
+      <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 60px;">TT</th>
+              <th style="width: 250px;">Họ và tên</th>
+              <th style="width: 150px;">CB/CV</th>
+              <th>Đơn vị</th>
+              <th class="td-center" style="width: 130px;">Bắn Súng</th>
+              <th class="td-center" style="width: 130px;">Thuốc nổ</th>
+              <th class="td-center" style="width: 130px;">Lựu đạn</th>
+              <th class="td-center" style="width: 130px; background:#e0e7ff; color:var(--accent);">XL CHUNG</th>
+            </tr>
+          </thead>
+          <tbody id="kq-tbody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -300,7 +327,19 @@
       <div class="section-title">Danh sách Điểm Bắn súng TLAK bài 1</div>
       <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
         <table>
-          <thead><tr><th style="width:40px;">TT</th><th style="width:250px;">Họ tên</th><th>CB/CV</th><th>Đơn vị</th><th class="td-center">Tổng Điểm</th><th class="td-center">Xếp loại</th></tr></thead>
+          <thead>
+            <tr>
+              <th style="width:40px; vertical-align: middle;">TT</th>
+              <th style="width:200px; vertical-align: middle;">Họ tên</th>
+              <th style="vertical-align: middle;">CB/CV</th>
+              <th style="vertical-align: middle;">Đơn vị</th>
+              <th colspan="3" class="td-center">Bia số 4</th>
+              <th colspan="3" class="td-center">Bia số 7</th>
+              <th colspan="3" class="td-center">Bia số 8</th>
+              <th class="td-center" style="vertical-align: middle;">Tổng Điểm</th>
+              <th class="td-center" style="vertical-align: middle;">Xếp loại</th>
+            </tr>
+          </thead>
           <tbody id="bs-tbody"></tbody>
         </table>
       </div>
@@ -338,6 +377,7 @@
                     <div class="custom-option selected" data-value="BS" onclick="selectCustomOption('cs-rank-subject','BS',this); updateRankOptions();">Bắn súng TLAK</div>
                     <div class="custom-option" data-value="TN" onclick="selectCustomOption('cs-rank-subject','TN',this); updateRankOptions();">Thuốc Nổ</div>
                     <div class="custom-option" data-value="LD" onclick="selectCustomOption('cs-rank-subject','LD',this); updateRankOptions();">Lựu Đạn</div>
+                    <div class="custom-option" data-value="CHUNG" onclick="selectCustomOption('cs-rank-subject','CHUNG',this); updateRankOptions();">🌟 Xếp loại Chung 3 Môn</div>
                 </div>
             </div>
             <div class="custom-select" id="cs-rank-type" style="width:280px;" data-value="ca_nhan">
@@ -361,12 +401,13 @@
 
 <script>
 // ===== CẤU HÌNH SUPABASE =====
-const SUPABASE_URL = 'https://uhgeatzoljngaqbvkwuo.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_XK6cYjdiFocWA4LohdrsCQ_9u1S3Y9f';
+// NHỚ ĐIỀN LẠI SUPABASE URL VÀ KEY MỚI CỦA ĐỒNG CHÍ VÀO ĐÂY
+const SUPABASE_URL = 'https://tuvxfcgipntxqzsuxrja.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_K6xH0edmwcz2BEsEd6NPSw_O_UXVvY2';
 const dbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let records = [];
-let recentLogs = []; // Lưu lại lịch sử cập nhật
+let recentLogs = []; 
 let currentFilter = { dv: 'all' };
 let lastUpdatedId = null; 
 
@@ -392,19 +433,19 @@ function guessSubject(r) {
 
 function sortRecordsArray() {
     records.sort((a, b) => {
-        // ID có dạng "1_0_Đại đội 1", split('_')[1] sẽ lấy ra số 0, 1, 2...
-        let idxA = parseInt((a.id || "").split('_')[1]);
-        let idxB = parseInt((b.id || "").split('_')[1]);
+        let idA = a.id ? String(a.id) : "";
+        let idB = b.id ? String(b.id) : "";
+        let idxA = parseInt(idA.split('_')[1]);
+        let idxB = parseInt(idB.split('_')[1]);
         return (isNaN(idxA) ? 0 : idxA) - (isNaN(idxB) ? 0 : idxB);
     });
 }
-
 async function loadData() {
-    const { data, error } = await dbClient.from('bang_diem').select('*'); 
+    const { data, error } = await dbClient.from('bang_diem_v2').select('*'); 
     if (error) { console.error('Lỗi lấy data:', error); return; }
     
     records = data || []; 
-    sortRecordsArray(); // CHÈN HÀM SẮP XẾP VÀO ĐÂY
+    sortRecordsArray(); 
     
     let sortedForLogs = [...records].sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0)).slice(0, 10);
     recentLogs = sortedForLogs.map(r => ({
@@ -413,21 +454,18 @@ async function loadData() {
 
     refreshAll();
 }
+
 dbClient.channel('tv-channel')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'bang_diem' }, payload => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bang_diem_v2' }, payload => {
         
         if (payload.eventType === 'INSERT') {
             records.push(payload.new);
-            
-            sortRecordsArray(); // Đã thay bằng hàm sắp xếp chuẩn
-            
+            sortRecordsArray(); 
             showToast(`Thêm mới: ${payload.new.ten}`);
             lastUpdatedId = payload.new.id;
             
             let changedSubj = guessSubject(payload.new);
             recentLogs.unshift({ rec: payload.new, subject: changedSubj, time: payload.new.updatedAt || Date.now() });
-            
-            // Xóa trùng người
             let uniqueLogs = []; let seenIds = new Set();
             for (let log of recentLogs) {
                 if (!seenIds.has(log.rec.id)) { seenIds.add(log.rec.id); uniqueLogs.push(log); }
@@ -445,7 +483,10 @@ dbClient.channel('tv-channel')
                 if (isRealUpdate) {
                     if (oldRec.xlTN !== payload.new.xlTN || oldRec.tnNd1Tc1 !== payload.new.tnNd1Tc1 || oldRec.tnNd1Tg !== payload.new.tnNd1Tg || oldRec.tnNd2Tc1 !== payload.new.tnNd2Tc1) changedSubj = 'TN';
                     else if (oldRec.xlLD !== payload.new.xlLD || oldRec.ldV1 !== payload.new.ldV1 || oldRec.ldV2 !== payload.new.ldV2 || oldRec.ldV3 !== payload.new.ldV3) changedSubj = 'LD';
-                    else if (oldRec.xlBS !== payload.new.xlBS || oldRec.bsTong !== payload.new.bsTong) changedSubj = 'BS';
+                    else if (oldRec.xlBS !== payload.new.xlBS || oldRec.bsTong !== payload.new.bsTong ||
+                             oldRec.n4_1 !== payload.new.n4_1 || oldRec.n4_2 !== payload.new.n4_2 || oldRec.n4_3 !== payload.new.n4_3 ||
+                             oldRec.n7_1 !== payload.new.n7_1 || oldRec.n7_2 !== payload.new.n7_2 || oldRec.n7_3 !== payload.new.n7_3 ||
+                             oldRec.n8_1 !== payload.new.n8_1 || oldRec.n8_2 !== payload.new.n8_2 || oldRec.n8_3 !== payload.new.n8_3) changedSubj = 'BS';
                     
                     showToast(`Vừa cập nhật điểm cho: ${payload.new.ten}`);
                     lastUpdatedId = payload.new.id;
@@ -458,16 +499,12 @@ dbClient.channel('tv-channel')
                     recentLogs = uniqueLogs.slice(0, 10);
                 }
                 records[index] = payload.new; 
-                
-                sortRecordsArray(); // Ép sắp xếp lại ngay khi có người được cập nhật điểm
+                sortRecordsArray(); 
                 
             } else {
                 records.push(payload.new);
-                
-                sortRecordsArray(); // Đã thay bằng hàm sắp xếp chuẩn
-                
+                sortRecordsArray(); 
                 lastUpdatedId = payload.new.id;
-                
                 recentLogs.unshift({ rec: payload.new, subject: changedSubj, time: payload.new.updatedAt || Date.now() });
                 let uniqueLogs = []; let seenIds = new Set();
                 for (let log of recentLogs) {
@@ -494,39 +531,7 @@ dbClient.channel('tv-channel')
 
 loadData();
 
-
 // ================== CÁC HÀM UI & RENDER ==================
-
-function updateSidebarUnits() {
-    let units = {};
-    records.forEach(r => {
-        if (r.dv) {
-            let parts = r.dv.split('/');
-            let d_level = parts[0] ? parts[0].trim().toUpperCase() : ''; 
-            let c_level = parts[1] ? parts[1].trim() : '';
-            if (d_level) {
-                units[d_level] = (units[d_level] || 0) + 1;
-                if (c_level) {
-                    let d_c = d_level + '/' + c_level;
-                    units[d_c] = (units[d_c] || 0) + 1;
-                }
-            }
-        }
-    });
-    
-    let html = '';
-    let keys = Object.keys(units).sort();
-    keys.forEach(u => {
-        let act = (currentFilter.dv === u) ? 'active' : '';
-        let isC = u.includes('/');
-        let display = isC ? '↳ ' + u.split('/')[1] : '⬢ ' + u;
-        let pad = isC ? 'padding-left: 40px;' : '';
-        let safeId = u.replace(/\//g, '-').replace(/\s+/g, '');
-        html += `<div class="sidebar-item ${act}" style="${pad}" onclick="filterDonVi('${u}')" id="sb-menu-${safeId}">${display} <span class="count-badge">${units[u]}</span></div>`;
-    });
-    document.getElementById('sidebar-dynamic-units').innerHTML = html;
-    document.getElementById('sb-all').textContent = records.length;
-}
 
 function filterDonVi(dv) {
     currentFilter.dv = dv;
@@ -543,30 +548,128 @@ function filterDonVi(dv) {
     refreshAll();
 }
 
+function updateSidebarUnits() {
+    let tree = {};
+    let total = records.length;
+    
+    // Quét dữ liệu, xử lý lỗi null hoặc "EMPTY"
+    records.forEach(r => {
+        let dvStr = (r.dv && String(r.dv).toUpperCase() !== 'EMPTY') ? String(r.dv) : 'Khác';
+        let parts = dvStr.split('/').map(p => p.trim()).filter(Boolean);
+        if(parts.length === 0) parts = ['Khác'];
+        
+        let current = tree;
+        let path = [];
+        parts.forEach(p => {
+            path.push(p);
+            let pathStr = path.join('/');
+            if (!current[p]) current[p] = { path: pathStr, name: p, count: 0, children: {} };
+            current[p].count++;
+            current = current[p].children;
+        });
+    });
+
+    // Hàm đệ quy vẽ cây Minimal
+    function buildHtml(node, level = 0) {
+        let html = '';
+        let keys = Object.keys(node).sort(); // Tự động sắp xếp ABC
+        keys.forEach(k => {
+            let item = node[k];
+            let hasChildren = Object.keys(item.children).length > 0;
+            let safeId = item.path.replace(/\//g, '-').replace(/\s+/g, '');
+            let activeClass = (currentFilter.dv === item.path) ? 'active' : '';
+            let isOpen = (currentFilter.dv.startsWith(item.path)) ? 'open' : '';
+            
+            let pad = level * 18 + 10; // Thụt lề theo cấp bậc
+            let toggleIcon = hasChildren ? `<span class="tree-toggle">▶</span>` : `<span style="display:inline-block; width:20px;"></span>`;
+            
+            if (hasChildren) {
+                html += `
+                <details class="sidebar-group" ${isOpen}>
+                    <summary class="sidebar-item ${activeClass}" id="sb-menu-${safeId}" onclick="filterDonVi('${item.path}'); event.preventDefault(); if(!this.parentNode.hasAttribute('open')) this.parentNode.setAttribute('open', '');" style="padding-left: ${pad}px;">
+                        ${toggleIcon} ${item.name} <span class="count-badge">${item.count}</span>
+                    </summary>
+                    ${buildHtml(item.children, level + 1)}
+                </details>`;
+            } else {
+                html += `<div class="sidebar-item ${activeClass}" id="sb-menu-${safeId}" onclick="filterDonVi('${item.path}')" style="padding-left: ${pad}px;">
+                    ${toggleIcon} ${item.name} <span class="count-badge">${item.count}</span>
+                </div>`;
+            }
+        });
+        return html;
+    }
+
+    document.getElementById('sidebar-dynamic-units').innerHTML = buildHtml(tree);
+    document.getElementById('sb-all').textContent = total;
+}
+
 function getFilteredRecords() {
     if (currentFilter.dv === 'all') return records;
     return records.filter(r => {
-        let parts = (r.dv || '').split('/');
-        let d_level = parts[0] ? parts[0].trim().toUpperCase() : '';
-        let c_level = parts[1] ? parts[1].trim() : '';
-        let val = currentFilter.dv;
-        if (val.includes('/')) {
-            return (d_level + '/' + c_level) === val;
-        } else {
-            return d_level === val;
-        }
+        let dvStr = (r.dv && String(r.dv).toUpperCase() !== 'EMPTY') ? String(r.dv) : 'Khác';
+        let parts = dvStr.split('/').map(p => p.trim()).filter(Boolean);
+        if (parts.length === 0) parts = ['Khác'];
+        let normDv = parts.join('/');
+        
+        // Khớp tuyệt đối hoặc khớp các cấp con bên trong (Vd: lọc dBB1 sẽ lấy cả dBB1/cBB1)
+        return normDv === currentFilter.dv || normDv.startsWith(currentFilter.dv + '/');
     });
+}
+
+// ================= LOGIC XẾP LOẠI CHUNG =================
+function tinhXepLoaiChungQuyChe(tongSo, soGioi, soKha, soDat) {
+    if (tongSo === 0) return 'Chưa KT';
+    let tyLeDatYeuCau = ((soGioi + soKha + soDat) / tongSo) * 100;
+    let tyLeGioi = (soGioi / tongSo) * 100;
+    let tyLeKha = (soKha / tongSo) * 100;
+
+    if (tyLeDatYeuCau >= 90 && tyLeGioi >= 50) return 'Giỏi';
+    if (tyLeDatYeuCau >= 80 && (tyLeGioi + tyLeKha) >= 50) return 'Khá';
+    if (tyLeDatYeuCau >= 70) return 'Đạt';
+    return 'Không đạt';
+}
+
+function xlChungCaNhan(xlBS, xlTN, xlLD) {
+    if (!xlBS || !xlTN || !xlLD || xlBS === 'Chưa kiểm tra' || xlTN === 'Chưa kiểm tra' || xlLD === 'Chưa kiểm tra') return 'Chưa KT';
+    let arr = [xlBS, xlTN, xlLD];
+    let soGioi = arr.filter(x => x === 'Giỏi').length;
+    let soKha = arr.filter(x => x === 'Khá').length;
+    let soDat = arr.filter(x => x === 'Đạt').length;
+    // Cá nhân thì luôn có 3 môn
+    return tinhXepLoaiChungQuyChe(3, soGioi, soKha, soDat);
 }
 
 function xlClass(xl){ return {'Giỏi':'xl-gioi','Khá':'xl-kha','Đạt':'xl-dat','Không đạt':'xl-kdat'}[xl]||'xl-empty'; }
 function xlPill(xl){ return (!xl || xl==='Chưa kiểm tra') ? `<span class="xl-pill xl-empty">Chưa KT</span>` : `<span class="xl-pill ${xlClass(xl)}">${xl}</span>`;}
 
 function refreshAll() {
-  updateSidebarUnits(); drawDashboards();
-  renderMainTable(); renderBanSung(); renderThuocNo(); renderLuuDan();
-  if (document.getElementById('page-xep-hang').classList.contains('active')) renderXepHang();
-  document.getElementById('hdr-total').textContent = records.length;
-  updateRankOptions(); 
+    updateSidebarUnits(); 
+    
+    // Nếu là file index.html thì chạy hàm này
+    if (typeof renderNhapLieuList === 'function') renderNhapLieuList(); 
+    
+    drawDashboards(); 
+    drawBattalionDashboards(); // Đã gọi hàm vẽ Tiểu đoàn an toàn
+    
+    // BỎ HẲN renderMainTable() VÌ GIAO DIỆN BẢNG ĐÓ ĐÃ BỊ XÓA
+    
+    renderBanSung(); 
+    renderThuocNo(); 
+    renderLuuDan(); 
+    
+    // Nếu là file tv.html thì chạy hàm này
+    if (typeof renderKetQua === 'function') renderKetQua(); 
+    
+    if (document.getElementById('page-xep-hang').classList.contains('active')) {
+        renderXepHang();
+    }
+    
+    // Đếm quân số lại bình thường
+    let totalEl = document.getElementById('hdr-total');
+    if(totalEl) totalEl.textContent = records.length;
+    
+    updateRankOptions(); 
 }
 
 function drawDashboards() {
@@ -574,6 +677,92 @@ function drawDashboards() {
     drawSingleChart('bs', 'xlBS', fRec);
     drawSingleChart('tn', 'xlTN', fRec);
     drawSingleChart('ld', 'xlLD', fRec);
+}
+
+function drawBattalionDashboards() {
+    const container = document.getElementById('dashboard-battalions');
+    if (!container) return;
+    let fRec = getFilteredRecords(); 
+
+    // Gom nhóm danh sách theo Tiểu đoàn (cấp d)
+    let battalions = {};
+    fRec.forEach(r => {
+        let dvStr = (r.dv && String(r.dv).toUpperCase() !== 'EMPTY') ? String(r.dv) : 'Khác';
+        let parts = dvStr.split('/').map(p => p.trim()).filter(Boolean);
+        let d = parts.length > 0 ? parts[0] : 'Khác';
+        if (!battalions[d]) battalions[d] = [];
+        battalions[d].push(r);
+    });
+
+    let html = '';
+    let bKeys = Object.keys(battalions).sort();
+    if(bKeys.length === 0) { container.innerHTML = ''; return; }
+
+    // Hàm tạo thanh tiến trình ngang (Đưa ra ngoài loop để an toàn tuyệt đối)
+    // Hàm tạo thanh tiến trình ngang (Đã bổ sung tính Xếp loại Tập thể)
+    function makeStatHtml(title, recs, subjectType) {
+        let valid = recs.filter(r => {
+            if (subjectType === 'CHUNG') return r.xlBS && r.xlBS !== 'Chưa kiểm tra' && r.xlTN && r.xlTN !== 'Chưa kiểm tra' && r.xlLD && r.xlLD !== 'Chưa kiểm tra';
+            return r[subjectType] && r[subjectType] !== 'Chưa kiểm tra';
+        });
+        
+        let vTotal = valid.length;
+        if(vTotal === 0) return `<div style="flex:1; background:var(--bg2); padding:16px; border-radius:8px; border:1px solid var(--border); text-align:center; color:var(--text2); font-size:13px;"><b>${title}</b><br>Chưa có dữ liệu</div>`;
+
+        let g=0, k=0, d=0, kd=0;
+        valid.forEach(r => {
+            let xl = subjectType === 'CHUNG' ? xlChungCaNhan(r.xlBS, r.xlTN, r.xlLD) : r[subjectType];
+            if(xl==='Giỏi') g++; else if(xl==='Khá') k++; else if(xl==='Đạt') d++; else kd++;
+        });
+
+        let pG = Math.round((g/vTotal)*100)||0; let pK = Math.round((k/vTotal)*100)||0; 
+        let pD = Math.round((d/vTotal)*100)||0; let pKD = Math.round((kd/vTotal)*100)||0;
+        let dyc = pG + pK + pD;
+        
+        // ĐOẠN MỚI: Tự động tính Xếp loại của Tập thể theo đúng Quy chế
+        let unitGrade = tinhXepLoaiChungQuyChe(vTotal, g, k, d);
+
+        return `
+        <div style="flex:1; background:var(--bg2); padding:16px; border-radius:8px; border:1px solid var(--border); box-shadow:0 2px 4px rgba(0,0,0,0.02); min-width: 220px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-weight:700; font-size:14px; color:var(--text);">${title}</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-weight:600; font-size:12px; color:var(--text2);">${dyc}% Đạt YC</span>
+                    ${xlPill(unitGrade)}
+                </div>
+            </div>
+            <div style="display:flex; height: 14px; width: 100%; border-radius: 6px; overflow: hidden; margin-bottom: 8px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
+                ${pG > 0 ? `<div style="width:${pG}%; background:var(--gioi);"></div>` : ''}
+                ${pK > 0 ? `<div style="width:${pK}%; background:var(--kha);"></div>` : ''}
+                ${pD > 0 ? `<div style="width:${pD}%; background:var(--dat);"></div>` : ''}
+                ${pKD > 0 ? `<div style="width:${pKD}%; background:var(--kdat);"></div>` : ''}
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:800;">
+                <span style="color:var(--gioi)">G: ${g} = ${pG}%</span>
+                <span style="color:var(--kha)">K: ${k} = ${pK}%</span>
+                <span style="color:var(--dat)">Đ: ${d} = ${pD}%</span>
+                <span style="color:var(--kdat)">KĐ: ${kd} = ${pKD}%</span>
+            </div>
+        </div>`;
+    }
+    bKeys.forEach(bName => {
+        let bRecs = battalions[bName];
+        let total = bRecs.length;
+
+        html += `
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:20px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
+            <div style="font-size:18px; font-weight:800; color:var(--text); margin-bottom:16px; border-left: 4px solid var(--accent); padding-left: 10px;">
+                ĐẦU MỐI: <span style="color:var(--accent);">${bName}</span> <span style="font-size:14px; color:var(--text2); font-weight:600;">(Quân số: ${total})</span>
+            </div>
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                ${makeStatHtml('🌟 XẾP LOẠI CHUNG', bRecs, 'CHUNG')}
+                ${makeStatHtml('🎯 Bắn súng TLAK', bRecs, 'xlBS')}
+                ${makeStatHtml('💥 Thuốc nổ', bRecs, 'xlTN')}
+                ${makeStatHtml('💣 Lựu đạn', bRecs, 'xlLD')}
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
 }
 
 function drawSingleChart(prefix, key, arr) {
@@ -646,7 +835,7 @@ function renderMainTable() {
 
 function renderBanSung(){ 
     const t=document.getElementById('bs-tbody'); let fRec = getFilteredRecords();
-    if(!fRec.length){t.innerHTML='<tr><td colspan="6" class="td-center" style="padding:20px;">Chưa có dữ liệu</td></tr>';return;} 
+    if(!fRec.length){t.innerHTML='<tr><td colspan="14" class="td-center" style="padding:20px;">Chưa có dữ liệu</td></tr>';return;} 
     
     t.innerHTML=fRec.map((r) => {
         let originIndex = records.findIndex(orig => orig.id === r.id);
@@ -654,8 +843,49 @@ function renderBanSung(){
         let diem = r.xlBS && r.xlBS !== 'Chưa kiểm tra' ? `<strong style="color:var(--accent); font-size:18px;">${r.bsTong}</strong>` : '—';
         let trClass = r.id === lastUpdatedId ? 'row-updated' : '';
         
-        return `<tr class="${trClass}"><td>${originIndex + 1}</td><td><strong style="font-size:16px;">${r.ten}</strong></td><td>${r.cb||''}</td><td style="font-size:13px; color:var(--text2);">${dvReversed}</td><td class="td-center">${diem}</td><td class="td-center">${xlPill(r.xlBS)}</td></tr>`;
+        return `<tr class="${trClass}">
+            <td>${originIndex + 1}</td>
+            <td><strong style="font-size:16px;">${r.ten}</strong></td>
+            <td>${r.cb||''}</td>
+            <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
+            <td class="td-center">${r.n4_1 ?? '-'}</td><td class="td-center">${r.n4_2 ?? '-'}</td><td class="td-center">${r.n4_3 ?? '-'}</td>
+            <td class="td-center">${r.n7_1 ?? '-'}</td><td class="td-center">${r.n7_2 ?? '-'}</td><td class="td-center">${r.n7_3 ?? '-'}</td>
+            <td class="td-center">${r.n8_1 ?? '-'}</td><td class="td-center">${r.n8_2 ?? '-'}</td><td class="td-center">${r.n8_3 ?? '-'}</td>
+            <td class="td-center">${diem}</td>
+            <td class="td-center">${xlPill(r.xlBS)}</td>
+        </tr>`;
     }).join(''); 
+}
+
+
+function renderKetQua() {
+    const tbody = document.getElementById('kq-tbody');
+    if (!tbody) return;
+    let fRecords = getFilteredRecords();
+    
+    if (!fRecords.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text2);padding:40px;font-style:italic;">Chưa có dữ liệu.</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = fRecords.map((r, idx) => {
+        let originIndex = records.findIndex(orig => orig.id === r.id); 
+        let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
+        let cbcv = (r.cb||'') + (r.cv ? '/'+r.cv : '');
+        let xlChung = xlChungCaNhan(r.xlBS, r.xlTN, r.xlLD);
+        let trClass = r.id === lastUpdatedId ? 'row-updated' : '';
+
+        return `<tr class="${trClass}">
+            <td style="font-weight:700; color:var(--text2);">${originIndex+1}</td>
+            <td><strong style="font-size:16px; color:var(--text);">${r.ten}</strong></td>
+            <td style="font-size:13px;">${cbcv}</td>
+            <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
+            <td class="td-center">${xlPill(r.xlBS)}</td>
+            <td class="td-center">${xlPill(r.xlTN)}</td>
+            <td class="td-center">${xlPill(r.xlLD)}</td>
+            <td class="td-center" style="background:#f5f8ff;">${xlPill(xlChung)}</td>
+        </tr>`;
+    }).join('');
 }
 
 function renderThuocNo(){ 
@@ -741,31 +971,53 @@ function updateRankOptions() {
 function renderXepHang(){ 
     const tHead=document.getElementById('xh-thead'); const tBody=document.getElementById('xh-tbody');
     let fRec = getFilteredRecords();
-    let subj = document.getElementById('cs-rank-subject').dataset.value || 'BS'; 
-    let type = document.getElementById('cs-rank-type').dataset.value || 'ca_nhan'; 
-    let xlKey = subj === 'BS' ? 'xlBS' : subj === 'TN' ? 'xlTN' : 'xlLD';
-    let d = fRec.filter(r => r[xlKey] && r[xlKey] !== 'Chưa kiểm tra');
+    
+    let subjElement = document.getElementById('cs-rank-subject');
+    let subj = subjElement.dataset.value || 'BS'; 
+    
+    let typeElement = document.getElementById('cs-rank-type');
+    let type = typeElement.dataset.value || 'ca_nhan'; 
+    
+    let d = fRec;
+    if (subj !== 'CHUNG') {
+        let xlKey = subj === 'BS' ? 'xlBS' : subj === 'TN' ? 'xlTN' : 'xlLD';
+        d = fRec.filter(r => r[xlKey] && r[xlKey] !== 'Chưa kiểm tra');
+    } else {
+        d = fRec.filter(r => r.xlBS && r.xlBS !== 'Chưa kiểm tra' && r.xlTN && r.xlTN !== 'Chưa kiểm tra' && r.xlLD && r.xlLD !== 'Chưa kiểm tra');
+    }
 
-    if(!d.length){ tHead.innerHTML=''; tBody.innerHTML='<tr><td colspan="6" class="td-center" style="padding:40px; color:var(--text2); font-style:italic;">Chưa có dữ liệu điểm này để xếp hạng</td></tr>'; return; } 
+    if(!d.length){ tHead.innerHTML=''; tBody.innerHTML='<tr><td colspan="7" class="td-center" style="padding:40px; color:var(--text2); font-style:italic;">Chưa có dữ liệu điểm này để xếp hạng</td></tr>'; return; } 
 
     if (type === 'ca_nhan') {
         tHead.innerHTML = `<tr><th style="width:60px;">Hạng</th><th style="width:250px;">Họ tên</th><th style="width:120px;">Cấp bậc</th><th>Đơn vị</th><th style="width:200px;" class="td-center">Điểm Thành tích</th><th class="td-center" style="width:140px;">Xếp loại</th></tr>`;
-        let sorted = [...d].sort((a,b) => b.bsTong - a.bsTong);
+        
+        let sorted = [...d].sort((a,b) => {
+            if (subj === 'CHUNG') {
+                // Xếp hạng chung thì dựa vào Tổng điểm BS làm phụ, hoặc chỉ chia nhóm
+                return (b.bsTong || 0) - (a.bsTong || 0);
+            }
+            return (b.bsTong || 0) - (a.bsTong || 0);
+        });
         
         tBody.innerHTML = sorted.map((r,i) => {
-            let pts = r.bsTong;
+            let pts = subj === 'BS' || subj === 'CHUNG' ? (r.bsTong + ' đ') : '—';
             let dvRev = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
-            let color = r.xlBS === 'Giỏi' ? 'var(--gioi)' : r.xlBS === 'Khá' ? 'var(--kha)' : r.xlBS === 'Đạt' ? 'var(--dat)' : 'var(--kdat)';
+            
+            let finalXL = '';
+            if (subj === 'CHUNG') finalXL = xlChungCaNhan(r.xlBS, r.xlTN, r.xlLD);
+            else finalXL = subj === 'BS' ? r.xlBS : subj === 'TN' ? r.xlTN : r.xlLD;
+
+            let color = finalXL === 'Giỏi' ? 'var(--gioi)' : finalXL === 'Khá' ? 'var(--kha)' : finalXL === 'Đạt' ? 'var(--dat)' : 'var(--kdat)';
             
             return `<tr>
                 <td><strong style="font-size:18px;">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong></td>
                 <td><strong style="color:var(--text); font-size: 16px;">${r.ten}</strong></td><td style="font-size:14px;">${r.cb||''}</td><td style="font-size:13px;color:var(--text2);">${dvRev}</td>
-                <td class="td-center"><strong style="color:${color}; font-size:18px;">${pts} đ</strong></td>
-                <td class="td-center">${xlPill(r.xlBS)}</td>
+                <td class="td-center"><strong style="color:${color}; font-size:16px;">${pts}</strong></td>
+                <td class="td-center">${xlPill(finalXL)}</td>
             </tr>`;
         }).join('');
     } else {
-        tHead.innerHTML = `<tr><th>Hạng</th><th>Tên đơn vị</th><th class="td-center">Quân số</th><th style="width:200px;">Tỷ lệ Đạt Yêu Cầu</th><th style="width:300px;">Biểu đồ chi tiết (G-K-Đ-KĐ)</th></tr>`;
+        tHead.innerHTML = `<tr><th>Hạng</th><th>Tên đơn vị</th><th class="td-center">Quân số</th><th class="td-center" style="width:140px;">Xếp Loại Chung</th><th style="width:180px;">Tỷ lệ Đạt Yêu Cầu</th><th style="width:280px;">Biểu đồ chi tiết (G-K-Đ-KĐ)</th></tr>`;
         
         let groups = {};
         d.forEach(r => {
@@ -780,12 +1032,16 @@ function renderXepHang(){
 
             if(!groups[uName]) groups[uName] = {name: uName, total:0, G:0, K:0, D:0, KD:0};
             groups[uName].total++;
-            let xl = r[xlKey];
+            
+            let xl = '';
+            if (subj === 'CHUNG') xl = xlChungCaNhan(r.xlBS, r.xlTN, r.xlLD);
+            else xl = subj === 'BS' ? r.xlBS : subj === 'TN' ? r.xlTN : r.xlLD;
+
             if(xl==='Giỏi') groups[uName].G++; else if(xl==='Khá') groups[uName].K++; else if(xl==='Đạt') groups[uName].D++; else groups[uName].KD++;
         });
         
         let groupArr = Object.values(groups);
-        if(groupArr.length === 0) { tBody.innerHTML = '<tr><td colspan="5" class="td-center" style="font-style:italic;">Không có đơn vị cấp này trong danh sách</td></tr>'; return; }
+        if(groupArr.length === 0) { tBody.innerHTML = '<tr><td colspan="6" class="td-center" style="font-style:italic;">Không có đơn vị cấp này trong danh sách</td></tr>'; return; }
 
         groupArr.sort((a,b) => {
             let pctA = (a.G + a.K + a.D) / a.total; let pctB = (b.G + b.K + b.D) / b.total;
@@ -798,12 +1054,16 @@ function renderXepHang(){
         tBody.innerHTML = groupArr.map((g, i) => {
             let pct = Math.round(((g.G + g.K + g.D) / g.total) * 100) || 0;
             let revName = g.name.split('/').reverse().join(' / ');
+            
+            let unitGrade = tinhXepLoaiChungQuyChe(g.total, g.G, g.K, g.D);
+
             let pG = Math.round(g.G/g.total*100) || 0, pK = Math.round(g.K/g.total*100) || 0, pD = Math.round(g.D/g.total*100) || 0, pKD = Math.round(g.KD/g.total*100) || 0;
 
             return `<tr>
                 <td><strong style="font-size:18px;">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</strong></td>
                 <td><strong style="color:var(--accent); font-size:16px;">${revName}</strong></td>
                 <td class="td-center"><span style="background:var(--bg3); padding:6px 14px; border-radius:6px; font-weight:800; font-size:15px;">${g.total}</span></td>
+                <td class="td-center">${xlPill(unitGrade)}</td>
                 <td><strong style="color:${pct>=70?'var(--gioi)':'var(--kdat)'}; font-size: 18px;">${pct}%</strong></td>
                 <td>
                     <div style="display:flex; height: 18px; width: 100%; border-radius: 6px; overflow: hidden; margin-bottom: 8px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
@@ -813,10 +1073,10 @@ function renderXepHang(){
                         ${pKD > 0 ? `<div style="width:${pKD}%; background:var(--kdat);"></div>` : ''}
                     </div>
                     <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:800;">
-                        <span style="color:var(--gioi)">G: ${pG}%</span>
-                        <span style="color:var(--kha)">K: ${pK}%</span>
-                        <span style="color:var(--dat)">Đ: ${pD}%</span>
-                        <span style="color:var(--kdat)">KĐ: ${pKD}%</span>
+                        <span style="color:var(--gioi)">G: ${g.G} = ${pG}%</span>
+                        <span style="color:var(--kha)">K: ${g.K} = ${pK}%</span>
+                        <span style="color:var(--dat)">Đ: ${g.D} = ${pD}%</span>
+                        <span style="color:var(--kdat)">KĐ: ${g.KD} = ${pKD}%</span>
                     </div>
                 </td>
             </tr>`;
@@ -832,6 +1092,7 @@ function showPage(id){
     if(id==='ban-sung') renderBanSung();
     if(id==='thuoc-no') renderThuocNo();
     if(id==='luu-dan') renderLuuDan();
+    if(id==='ket-qua') renderKetQua();
 }
 </script>
 </body>
