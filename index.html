@@ -164,6 +164,50 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
   ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  /* --- BẮT ĐẦU CSS TỐI ƯU CHO MOBILE & THU PHÓNG SIDEBAR --- */
+  
+  /* 1. Hiệu ứng Sidebar */
+  .sidebar { 
+      transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+  }
+  .sidebar.collapsed { 
+      margin-left: -240px; /* Ẩn sidebar đi */
+  }
+
+  /* 2. Ép bảng cho phép vuốt ngang mượt mà trên cảm ứng */
+  .table-wrap {
+      overflow-x: auto; 
+      -webkit-overflow-scrolling: touch; 
+  }
+  
+  /* Đảm bảo bảng không bị bóp méo quá đà khi vuốt */
+  table { min-width: 800px; } /* Màn hình nhỏ sẽ xuất hiện thanh cuộn */
+
+  /* 3. Tối ưu giao diện khi màn hình nhỏ (Điện thoại / Tablet dọc) */
+  @media (max-width: 820px) {
+      .header-top { flex-direction: column; align-items: flex-start; gap: 12px; padding: 10px 15px; }
+      .app-title h1 { font-size: 14px; }
+      
+      /* Cho phép thanh Menu Tab vuốt ngang */
+      .nav { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding: 0 5px; }
+      .nav-item { padding: 12px 15px; font-size: 13px; }
+      
+      /* Cột biểu đồ tự động xếp dọc */
+      .charts-grid { grid-template-columns: 1fr; }
+      
+      /* Thu nhỏ chữ và lề của bảng */
+      th { padding: 10px 8px; font-size: 11px; }
+      td { padding: 10px 8px; font-size: 13px; }
+      
+      /* Biến Sidebar thành dạng nổi đè lên trên (Overlay) để không chiếm chỗ của bảng */
+      .sidebar { 
+          position: absolute; 
+          z-index: 100; 
+          height: calc(100vh - 120px); 
+          box-shadow: 4px 0 15px rgba(0,0,0,0.15); 
+      }
+  }
+  /* --- KẾT THÚC CSS MOBILE --- */
 </style>
 </head>
 <body>
@@ -173,13 +217,18 @@
 <div class="header">
   <div class="header-top">
     <div class="logo-area">
+      <button onclick="toggleSidebar()" style="background:transparent; border:none; color:#fde047; font-size:26px; cursor:pointer; margin-right:8px; padding:0; display:flex; align-items:center;">
+          ☰
+      </button>
+      
       <div class="star-logo">
         <img src="logo.png" alt="Logo">
       </div>
-      <div class="app-title" style="text-align:center;">
+      <div class="app-title" style="text-align:left;">
         <h1>SƯ ĐOÀN BỘ BINH 315</h1>
         <h1>Phần mềm quản lý kết quả kiểm tra 3 môn tiếng nổ CSM</h1>
       </div>
+    </div>
     </div>
     <div style="display: flex; gap: 15px; align-items: center;">
       <div class="badge">Tổng Quân Số: <span id="hdr-total">0</span></div>
@@ -418,7 +467,15 @@ const dbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let records = [];
 let recentLogs = []; 
 let currentFilter = { dv: 'all' };
-let lastUpdatedId = null; 
+let lastUpdatedId = null;
+
+// Hàm Thu/Phóng Sidebar
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    if(sidebar) {
+        sidebar.classList.toggle('collapsed');
+    }
+}
 
 function showToast(msg) {
     const container = document.getElementById('toast-container');
