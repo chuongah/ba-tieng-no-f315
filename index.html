@@ -418,8 +418,13 @@ let recentLogs = [];
 let currentFilter = { dv: 'all' };
 let lastUpdatedId = null; 
 
-// DANH SÁCH 4 BẢNG DỮ LIỆU CẦN GỘP LÊN TV
-const dsBang = ['bang_diem_dbb1', 'bang_diem_dbb2', 'bang_diem_dbb3', 'bang_diem_e142'];
+// Danh sách bảng và tên hiển thị tương ứng trên TV
+const dsBang = [
+    { table: 'bang_diem_dbb1', label: 'dBB1' },
+    { table: 'bang_diem_dbb2', label: 'dBB2' },
+    { table: 'bang_diem_dbb3', label: 'dBB3' },
+    { table: 'bang_diem_e142', label: 'dBB4' } 
+];
 
 function showToast(msg) {
     const container = document.getElementById('toast-container');
@@ -455,14 +460,23 @@ function sortRecordsArray() {
 
 async function loadData() {
     try {
-        console.log("Đang tải dữ liệu tổng hợp từ 4 bảng...");
-        let lenhTai = dsBang.map(tenBang => dbClient.from(tenBang).select('*'));
-        let ketQua = await Promise.all(lenhTai);
+        console.log("Đang tải dữ liệu gộp và phân loại theo Tiểu đoàn...");
+        let promises = dsBang.map(item => 
+            dbClient.from(item.table).select('*').then(res => {
+                if (res.data) {
+                    // Tự động đóng dấu tên Tiểu đoàn để không bị gộp trùng Đại đội
+                    return res.data.map(r => ({
+                        ...r,
+                        dv: item.label + '/' + (r.dv || 'Khác')
+                    }));
+                }
+                return [];
+            })
+        );
         
+        let results = await Promise.all(promises);
         records = [];
-        ketQua.forEach(kq => {
-            if (kq.data) records = records.concat(kq.data);
-        });
+        results.forEach(data => { records = records.concat(data); });
         
         sortRecordsArray(); 
         
@@ -477,24 +491,27 @@ async function loadData() {
     }
 }
 
-// Thiết lập Realtime cho cả 4 bảng để tự nhảy điểm
-dsBang.forEach(tenBang => {
-    dbClient.channel('kenh-' + tenBang)
-        .on('postgres_changes', { event: '*', schema: 'public', table: tenBang }, payload => {
+// Cập nhật Realtime cho cả 4 bảng
+dsBang.forEach(item => {
+    dbClient.channel('kenh-' + item.table)
+        .on('postgres_changes', { event: '*', schema: 'public', table: item.table }, payload => {
             let moi = payload.new;
             if (payload.eventType === 'DELETE') {
                 records = records.filter(r => r.id !== payload.old.id);
-                recentLogs = recentLogs.filter(log => log.rec.id !== payload.old.id);
+                recentLogs = recentLogs.filter(l => l.rec.id !== payload.old.id);
             } else {
+                // Tự động đóng dấu tên Tiểu đoàn cho dữ liệu vừa nhảy về
+                moi.dv = item.label + '/' + (moi.dv || 'Khác');
+                
                 let vt = records.findIndex(r => r.id === moi.id);
                 if (vt >= 0) records[vt] = moi; else records.push(moi);
                 lastUpdatedId = moi.id;
                 
                 let changedSubj = guessSubject(moi);
                 recentLogs.unshift({ rec: moi, subject: changedSubj, time: moi.updatedAt || Date.now() });
-                
                 let seen = new Set();
                 recentLogs = recentLogs.filter(l => seen.has(l.rec.id) ? false : seen.add(l.rec.id)).slice(0, 10);
+                showToast(`Vừa cập nhật điểm cho: ${moi.ten}`);
             }
             sortRecordsArray();
             refreshAll();
@@ -510,126 +527,6 @@ dsBang.forEach(tenBang => {
 
 loadData();
 
-// ================== HÀM VẼ BẢNG LIVE (ĐÃ FIX LỖI CRASH VÀ GIỮ NGUYÊN LỆNH REVERSE) ==================
-
-function renderMainTable() {
-  const tbody = document.getElementById('main-tbody'); 
-  if(!tbody) return;
-  let fRecords = getFilteredRecords();
-  let filteredLogs = recentLogs.filter(log => fRecords.some(r => r.id === log.rec.id));
-  
-  if(!filteredLogs.length){
-      tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text2);font-style:italic;">Chưa có dữ liệu mới</td></tr>';
-      return;
-  }
-  
-  // Đã thêm idx để hết lỗi trắng trang
-  tbody.innerHTML = filteredLogs.map((log, idx) => {
-      let r = log.rec;
-      // VẪN GIỮ NGUYÊN .reverse() ĐỂ HIỆN CHUẨN: Tiểu đội / Trung đội / Đại đội
-      let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
-      let trClass = r.id === lastUpdatedId ? 'row-updated' : '';
-
-      let cols = '';
-      if (log.subject === 'BS') {
-          cols = `<td class="td-center"><strong style="color:var(--accent); font-size:14px;">BẮN SÚNG</strong></td>
-                  <td class="td-center" style="width:120px;">Điểm: <strong style="font-size:16px;">${r.bsTong!=null?r.bsTong:'-'}</strong></td>
-                  <td class="td-center" colspan="2">XL: ${xlPill(r.xlBS)}</td>`;
-      } else if (log.subject === 'TN') {
-          cols = `<td class="td-center"><strong style="color:var(--gold); font-size:14px;">THUỐC NỔ</strong></td>
-                  <td class="td-center" style="width:110px;">ND1: ${xlPill(r.xlND1)}</td>
-                  <td class="td-center" style="width:110px;">ND2: ${xlPill(r.xlND2)}</td>
-                  <td class="td-center" style="width:110px;">Tổng: ${xlPill(r.xlTN)}</td>`;
-      } else {
-          cols = `<td class="td-center"><strong style="color:var(--accent3); font-size:14px;">LỰU ĐẠN</strong></td>
-                  <td class="td-center" colspan="3">Xếp loại: ${xlPill(r.xlLD)}</td>`;
-      }
-
-      return `<tr class="${trClass}">
-                <td>${idx + 1}</td>
-                <td><strong style="color:var(--text); font-size: 16px;">${r.ten}</strong></td>
-                <td>${r.cb||''}</td>
-                <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
-                ${cols}
-              </tr>`;
-  }).join('');
-}
-dbClient.channel('tv-channel')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'bang_diem_e142' }, payload => {
-        
-        if (payload.eventType === 'INSERT') {
-            records.push(payload.new);
-            sortRecordsArray(); 
-            showToast(`Thêm mới: ${payload.new.ten}`);
-            lastUpdatedId = payload.new.id;
-            
-            let changedSubj = guessSubject(payload.new);
-            recentLogs.unshift({ rec: payload.new, subject: changedSubj, time: payload.new.updatedAt || Date.now() });
-            let uniqueLogs = []; let seenIds = new Set();
-            for (let log of recentLogs) {
-                if (!seenIds.has(log.rec.id)) { seenIds.add(log.rec.id); uniqueLogs.push(log); }
-            }
-            recentLogs = uniqueLogs.slice(0, 10);
-        } 
-        else if (payload.eventType === 'UPDATE') {
-            let index = records.findIndex(r => r.id === payload.new.id);
-            let changedSubj = guessSubject(payload.new);
-            
-            if (index !== -1) {
-                let oldRec = records[index];
-                let isRealUpdate = oldRec.updatedAt !== payload.new.updatedAt;
-                
-                if (isRealUpdate) {
-                    if (oldRec.xlTN !== payload.new.xlTN || oldRec.tnNd1Tc1 !== payload.new.tnNd1Tc1 || oldRec.tnNd1Tg !== payload.new.tnNd1Tg || oldRec.tnNd2Tc1 !== payload.new.tnNd2Tc1) changedSubj = 'TN';
-                    else if (oldRec.xlLD !== payload.new.xlLD || oldRec.ldV1 !== payload.new.ldV1 || oldRec.ldV2 !== payload.new.ldV2 || oldRec.ldV3 !== payload.new.ldV3) changedSubj = 'LD';
-                    else if (oldRec.xlBS !== payload.new.xlBS || oldRec.bsTong !== payload.new.bsTong ||
-                             oldRec.n4_1 !== payload.new.n4_1 || oldRec.n4_2 !== payload.new.n4_2 || oldRec.n4_3 !== payload.new.n4_3 ||
-                             oldRec.n7_1 !== payload.new.n7_1 || oldRec.n7_2 !== payload.new.n7_2 || oldRec.n7_3 !== payload.new.n7_3 ||
-                             oldRec.n8_1 !== payload.new.n8_1 || oldRec.n8_2 !== payload.new.n8_2 || oldRec.n8_3 !== payload.new.n8_3) changedSubj = 'BS';
-                    
-                    showToast(`Vừa cập nhật điểm cho: ${payload.new.ten}`);
-                    lastUpdatedId = payload.new.id;
-                    
-                    recentLogs.unshift({ rec: payload.new, subject: changedSubj, time: payload.new.updatedAt || Date.now() });
-                    let uniqueLogs = []; let seenIds = new Set();
-                    for (let log of recentLogs) {
-                        if (!seenIds.has(log.rec.id)) { seenIds.add(log.rec.id); uniqueLogs.push(log); }
-                    }
-                    recentLogs = uniqueLogs.slice(0, 10);
-                }
-                records[index] = payload.new; 
-                sortRecordsArray(); 
-                
-            } else {
-                records.push(payload.new);
-                sortRecordsArray(); 
-                lastUpdatedId = payload.new.id;
-                recentLogs.unshift({ rec: payload.new, subject: changedSubj, time: payload.new.updatedAt || Date.now() });
-                let uniqueLogs = []; let seenIds = new Set();
-                for (let log of recentLogs) {
-                    if (!seenIds.has(log.rec.id)) { seenIds.add(log.rec.id); uniqueLogs.push(log); }
-                }
-                recentLogs = uniqueLogs.slice(0, 10);
-            }
-        } 
-        else if (payload.eventType === 'DELETE') {
-            records = records.filter(r => r.id !== payload.old.id);
-            recentLogs = recentLogs.filter(log => log.rec.id !== payload.old.id);
-        }
-        
-        refreshAll();
-        
-        if (lastUpdatedId) {
-            setTimeout(() => {
-                lastUpdatedId = null;
-                renderMainTable(); renderBanSung(); renderThuocNo(); renderLuuDan();
-            }, 3000);
-        }
-    })
-    .subscribe();
-
-loadData();
-
 // ================== CÁC HÀM UI & RENDER ==================
 
 function filterDonVi(dv) {
@@ -639,10 +536,10 @@ function filterDonVi(dv) {
         document.getElementById('sb-menu-all').classList.add('active');
         document.getElementById('db-title-donvi').textContent = 'Biểu đồ Tổng hợp kết quả Toàn đơn vị';
     } else {
-        let safeId = dv.replace(/\//g, '-').replace(/\s+/g, '');
+        let safeId = dv.replace(/[\/\s]/g, '-');
         let el = document.getElementById('sb-menu-' + safeId);
         if(el) el.classList.add('active');
-        document.getElementById('db-title-donvi').textContent = 'Biểu đồ Tổng hợp kết quả ' + dv;
+        document.getElementById('db-title-donvi').textContent = 'Biểu đồ Tổng hợp kết quả ' + dv.split('/').reverse().join(' / ');
     }
     refreshAll();
 }
@@ -651,7 +548,6 @@ function updateSidebarUnits() {
     let tree = {};
     let total = records.length;
     
-    // Quét dữ liệu, xử lý lỗi null hoặc "EMPTY"
     records.forEach(r => {
         let dvStr = (r.dv && String(r.dv).toUpperCase() !== 'EMPTY') ? String(r.dv) : 'Khác';
         let parts = dvStr.split('/').map(p => p.trim()).filter(Boolean);
@@ -668,19 +564,18 @@ function updateSidebarUnits() {
         });
     });
 
-    // Hàm đệ quy vẽ cây Minimal
     function buildHtml(node, level = 0) {
         let html = '';
-        let keys = Object.keys(node).sort(); // Tự động sắp xếp ABC
+        let keys = Object.keys(node).sort(); 
         keys.forEach(k => {
             let item = node[k];
             let hasChildren = Object.keys(item.children).length > 0;
-            let safeId = item.path.replace(/\//g, '-').replace(/\s+/g, '');
+            let safeId = item.path.replace(/[\/\s]/g, '-');
             let activeClass = (currentFilter.dv === item.path) ? 'active' : '';
             let isOpen = (currentFilter.dv.startsWith(item.path)) ? 'open' : '';
             
-            let pad = level * 18 + 10; // Thụt lề theo cấp bậc
-            let toggleIcon = hasChildren ? `<span class="tree-toggle">▶</span>` : `<span style="display:inline-block; width:20px;"></span>`;
+            let pad = level * 18 + 10; 
+            let toggleIcon = hasChildren ? `<span class="tree-toggle">▶</span>` : `<span style="display:inline-block; width:16px;"></span>`;
             
             if (hasChildren) {
                 html += `
@@ -699,8 +594,10 @@ function updateSidebarUnits() {
         return html;
     }
 
-    document.getElementById('sidebar-dynamic-units').innerHTML = buildHtml(tree);
-    document.getElementById('sb-all').textContent = total;
+    const container = document.getElementById('sidebar-dynamic-units');
+    if(container) container.innerHTML = buildHtml(tree);
+    const totalBadge = document.getElementById('sb-all');
+    if(totalBadge) totalBadge.textContent = total;
 }
 
 function getFilteredRecords() {
@@ -710,8 +607,6 @@ function getFilteredRecords() {
         let parts = dvStr.split('/').map(p => p.trim()).filter(Boolean);
         if (parts.length === 0) parts = ['Khác'];
         let normDv = parts.join('/');
-        
-        // Khớp tuyệt đối hoặc khớp các cấp con bên trong (Vd: lọc dBB1 sẽ lấy cả dBB1/cBB1)
         return normDv === currentFilter.dv || normDv.startsWith(currentFilter.dv + '/');
     });
 }
@@ -735,7 +630,6 @@ function xlChungCaNhan(xlBS, xlTN, xlLD) {
     let soGioi = arr.filter(x => x === 'Giỏi').length;
     let soKha = arr.filter(x => x === 'Khá').length;
     let soDat = arr.filter(x => x === 'Đạt').length;
-    // Cá nhân thì luôn có 3 môn
     return tinhXepLoaiChungQuyChe(3, soGioi, soKha, soDat);
 }
 
@@ -751,19 +645,12 @@ function formatTime(tg) {
     let s_str = s < 10 ? '0' + s : s;
     return `: ${m_str}'${s_str}"`;
 }
-function refreshAll() {
-  // Sắp xếp tương tự index.html
-  records.sort((a, b) => {
-      let dvA = a.dv || ""; let dvB = b.dv || "";
-      if (dvA !== dvB) return dvA.localeCompare(dvB);
-      let idxA = parseInt(String(a.id).split('_')[1]) || 0;
-      let idxB = parseInt(String(b.id).split('_')[1]) || 0;
-      return idxA - idxB;
-  });
 
+function refreshAll() {
   updateSidebarUnits(); 
   drawDashboards(); 
   drawSubUnitDashboards();
+  renderMainTable();
   renderBanSung(); 
   renderThuocNo(); 
   renderLuuDan(); 
@@ -782,17 +669,14 @@ function drawDashboards() {
 }
 
 function drawSubUnitDashboards() {
-    const container = document.getElementById('dashboard-battalions'); // Vẫn dùng ID cũ để không phải sửa HTML
+    const container = document.getElementById('dashboard-subunits'); 
     if (!container) return;
     let fRec = getFilteredRecords(); 
 
-    // Tính toán độ sâu hiện tại để phân tích cấp con
     let targetDepth = currentFilter.dv === 'all' ? 0 : currentFilter.dv.split('/').length;
-
     let groups = {};
     fRec.forEach(r => {
-        let dvStr = (r.dv && String(r.dv).toUpperCase() !== 'EMPTY') ? String(r.dv) : 'Khác';
-        let parts = dvStr.split('/').map(p => p.trim()).filter(Boolean);
+        let parts = (r.dv || '').split('/').map(p => p.trim()).filter(Boolean);
         if (parts.length > targetDepth) {
             let gName = parts.slice(0, targetDepth + 1).join('/'); 
             if (!groups[gName]) groups[gName] = [];
@@ -801,16 +685,70 @@ function drawSubUnitDashboards() {
     });
 
     let bKeys = Object.keys(groups).sort();
+    let mainTitle = document.getElementById('title-phan-tich');
+
     if(bKeys.length === 0) { 
-        container.innerHTML = '<div style="color:var(--text2); font-style:italic; padding:20px; text-align:center;">(Cấp này không có phân đội trực thuộc để phân tích biểu đồ)</div>'; 
+        container.innerHTML = '<div style="color:var(--text2); font-style:italic; padding:20px; text-align:center;">(Phân đội nhỏ nhất, không thể phân tích sâu hơn)</div>'; 
+        if(mainTitle) mainTitle.textContent = '';
         return; 
     }
 
-    let html = '';
-    bKeys.forEach(gPath => {
+    let titleName = "các phân đội trực thuộc";
+    let sampleName = bKeys[0].split('/').pop().toUpperCase();
+    if(sampleName.includes('DBB')) titleName = 'các Tiểu đoàn';
+    else if(/^[IVX]+$/.test(sampleName) || sampleName.includes('CBB')) titleName = 'các Đại đội';
+    else if(/^[A-Z]$/.test(sampleName) || sampleName.includes('BBB')) titleName = 'các Trung đội';
+    else if(sampleName.includes('-') || sampleName.includes('*') || sampleName.includes('ABB')) titleName = 'các Tiểu đội';
+
+    if(mainTitle) mainTitle.textContent = `📊 Phân tích chất lượng ${titleName}`;
+
+    function makeStatHtml(title, recs, subjectType) {
+        let valid = recs.filter(r => {
+            if (subjectType === 'CHUNG') return r.xlBS && r.xlBS !== 'Chưa kiểm tra' && r.xlTN && r.xlTN !== 'Chưa kiểm tra' && r.xlLD && r.xlLD !== 'Chưa kiểm tra';
+            return r[subjectType] && r[subjectType] !== 'Chưa kiểm tra';
+        });
+        
+        let vTotal = valid.length;
+        if(vTotal === 0) return `<div style="flex:1; background:var(--bg2); padding:16px; border-radius:8px; border:1px solid var(--border); text-align:center; color:var(--text2); font-size:13px;"><b>${title}</b><br>Chưa có dữ liệu</div>`;
+
+        let g=0, k=0, d=0, kd=0;
+        valid.forEach(r => {
+            let xl = subjectType === 'CHUNG' ? xlChungCaNhan(r.xlBS, r.xlTN, r.xlLD) : r[subjectType];
+            if(xl==='Giỏi') g++; else if(xl==='Khá') k++; else if(xl==='Đạt') d++; else kd++;
+        });
+
+        let pG = Math.round((g/vTotal)*100)||0; let pK = Math.round((k/vTotal)*100)||0; 
+        let pD = Math.round((d/vTotal)*100)||0; let pKD = Math.round((kd/vTotal)*100)||0;
+        let unitGrade = tinhXepLoaiChungQuyChe(vTotal, g, k, d);
+
+        return `
+        <div style="flex:1; background:var(--bg2); padding:16px; border-radius:8px; border:1px solid var(--border); box-shadow:0 2px 4px rgba(0,0,0,0.02); min-width: 220px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-weight:700; font-size:14px; color:var(--text);">${title}</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-weight:600; font-size:12px; color:var(--text2);">${pG + pK + pD}% Đạt YC</span>
+                    ${xlPill(unitGrade)}
+                </div>
+            </div>
+            <div style="display:flex; height: 14px; width: 100%; border-radius: 6px; overflow: hidden; margin-bottom: 8px;">
+                ${pG > 0 ? `<div style="width:${pG}%; background:var(--gioi);"></div>` : ''}
+                ${pK > 0 ? `<div style="width:${pK}%; background:var(--kha);"></div>` : ''}
+                ${pD > 0 ? `<div style="width:${pD}%; background:var(--dat);"></div>` : ''}
+                ${pKD > 0 ? `<div style="width:${pKD}%; background:var(--kdat);"></div>` : ''}
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:800;">
+                <span style="color:var(--gioi)">G: ${g} = ${pG}%</span>
+                <span style="color:var(--kha)">K: ${k} = ${pK}%</span>
+                <span style="color:var(--dat)">Đ: ${d} = ${pD}%</span>
+                <span style="color:var(--kdat)">KĐ: ${kd} = ${pKD}%</span>
+            </div>
+        </div>`;
+    }
+
+    container.innerHTML = bKeys.map(gPath => {
         let bRecs = groups[gPath];
-        let displayName = gPath.split('/').pop(); // Lấy tên đơn vị cuối cùng (c hoặc b hoặc a)
-        html += `
+        let displayName = gPath.split('/').pop(); 
+        return `
         <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:20px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
             <div style="font-size:18px; font-weight:800; color:var(--text); margin-bottom:16px; border-left: 4px solid var(--accent); padding-left: 10px;">
                 ĐẦU MỐI: <span style="color:var(--accent);">${displayName}</span> <span style="font-size:14px; color:var(--text2); font-weight:600;">(Quân số: ${bRecs.length})</span>
@@ -822,8 +760,7 @@ function drawSubUnitDashboards() {
                 ${makeStatHtml('💣 Lựu đạn', bRecs, 'xlLD')}
             </div>
         </div>`;
-    });
-    container.innerHTML = html;
+    }).join('');
 }
 
 function drawSingleChart(prefix, key, arr) {
@@ -852,6 +789,7 @@ function drawSingleChart(prefix, key, arr) {
     document.getElementById(`bar-${prefix}`).innerHTML = html;
 }
 
+// ================= RENDER BẢNG (Giữ nguyên .reverse() để đọc thuận mắt) =================
 function renderMainTable() {
   const tbody = document.getElementById('main-tbody'); 
   if(!tbody) return;
@@ -863,11 +801,9 @@ function renderMainTable() {
       return;
   }
   
-  // SỬA: Thêm idx vào tham số của map để không bị lỗi undefined
   tbody.innerHTML = filteredLogs.map((log, idx) => {
       let r = log.rec;
-      // HIỂN THỊ XUÔI: Đại đội / Trung đội / Tiểu đội
-      let dvHienThi = (r.dv || '').split('/').filter(Boolean).join(' / ');
+      let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
       let trClass = r.id === lastUpdatedId ? 'row-updated' : '';
 
       let cols = '';
@@ -889,34 +825,11 @@ function renderMainTable() {
                 <td>${idx + 1}</td>
                 <td><strong style="color:var(--text); font-size: 16px;">${r.ten}</strong></td>
                 <td>${r.cb||''}</td>
-                <td style="font-size:13px; color:var(--text2);">${dvHienThi}</td>
+                <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
                 ${cols}
               </tr>`;
   }).join('');
 }
-
-function renderBanSung(){ 
-    const t=document.getElementById('bs-tbody'); let fRec = getFilteredRecords();
-    if(!fRec.length){t.innerHTML='<tr><td colspan="15" class="td-center" style="padding:20px;">Chưa có dữ liệu</td></tr>';return;} 
-    
-    // Đã thêm chữ "idx" vào trong map(r, idx)
-    t.innerHTML=fRec.map((r, idx) => {
-        let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
-        let trClass = (typeof lastUpdatedId !== 'undefined' && r.id === lastUpdatedId) ? 'row-updated' : '';
-        
-        return `<tr class="clickable-row ${trClass}" onclick="editSubject('${r.id}', 'BS', 'ban-sung')">
-            <td style="font-weight:700;">${idx + 1}</td> <td><strong style="font-size:16px;">${r.ten}</strong></td>
-            <td>${r.cb||''}</td>
-            <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
-            <td class="td-center">${r.n4_1!=null?r.n4_1:'-'}</td><td class="td-center">${r.n4_2!=null?r.n4_2:'-'}</td><td class="td-center">${r.n4_3!=null?r.n4_3:'-'}</td>
-            <td class="td-center">${r.n7_1!=null?r.n7_1:'-'}</td><td class="td-center">${r.n7_2!=null?r.n7_2:'-'}</td><td class="td-center">${r.n7_3!=null?r.n7_3:'-'}</td>
-            <td class="td-center">${r.n8_1!=null?r.n8_1:'-'}</td><td class="td-center">${r.n8_2!=null?r.n8_2:'-'}</td><td class="td-center">${r.n8_3!=null?r.n8_3:'-'}</td>
-            <td class="td-center"><strong style="color:var(--accent); font-size:16px;">${r.bsTong!=null?r.bsTong:'—'}</strong></td>
-            <td class="td-center">${xlPill(r.xlBS)}</td>
-        </tr>`;
-    }).join(''); 
-}
-
 
 function renderKetQua() {
     const tbody = document.getElementById('kq-tbody');
@@ -928,7 +841,6 @@ function renderKetQua() {
         return;
     }
     
-    // Dùng biến idx
     tbody.innerHTML = fRecords.map((r, idx) => {
         let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
         let cbcv = (r.cb||'') + (r.cv ? '/'+r.cv : '');
@@ -947,11 +859,31 @@ function renderKetQua() {
     }).join('');
 }
 
+function renderBanSung(){ 
+    const t=document.getElementById('bs-tbody'); let fRec = getFilteredRecords();
+    if(!fRec.length){t.innerHTML='<tr><td colspan="15" class="td-center" style="padding:20px;">Chưa có dữ liệu</td></tr>';return;} 
+    
+    t.innerHTML=fRec.map((r, idx) => {
+        let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
+        let trClass = (typeof lastUpdatedId !== 'undefined' && r.id === lastUpdatedId) ? 'row-updated' : '';
+        
+        return `<tr class="${trClass}">
+            <td style="font-weight:700;">${idx + 1}</td> <td><strong style="font-size:16px;">${r.ten}</strong></td>
+            <td>${r.cb||''}</td>
+            <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
+            <td class="td-center">${r.n4_1!=null?r.n4_1:'-'}</td><td class="td-center">${r.n4_2!=null?r.n4_2:'-'}</td><td class="td-center">${r.n4_3!=null?r.n4_3:'-'}</td>
+            <td class="td-center">${r.n7_1!=null?r.n7_1:'-'}</td><td class="td-center">${r.n7_2!=null?r.n7_2:'-'}</td><td class="td-center">${r.n7_3!=null?r.n7_3:'-'}</td>
+            <td class="td-center">${r.n8_1!=null?r.n8_1:'-'}</td><td class="td-center">${r.n8_2!=null?r.n8_2:'-'}</td><td class="td-center">${r.n8_3!=null?r.n8_3:'-'}</td>
+            <td class="td-center"><strong style="color:var(--accent); font-size:16px;">${r.bsTong!=null?r.bsTong:'—'}</strong></td>
+            <td class="td-center">${xlPill(r.xlBS)}</td>
+        </tr>`;
+    }).join(''); 
+}
+
 function renderThuocNo(){ 
     const t=document.getElementById('tn-tbody'); let fRec = getFilteredRecords();
     if(!fRec.length){t.innerHTML='<tr><td colspan="7" class="td-center" style="padding:20px;">Chưa có dữ liệu</td></tr>';return;} 
     
-    // Đã thêm chữ "idx" vào trong map(r, idx)
     t.innerHTML=fRec.map((r, idx) => {
         let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
         let trClass = (typeof lastUpdatedId !== 'undefined' && r.id === lastUpdatedId) ? 'row-updated' : '';
@@ -960,7 +892,7 @@ function renderThuocNo(){
         let txtND1 = (r.xlND1 && r.xlND1 !== 'Chưa kiểm tra') ? (r.xlND1 + timeStr) : r.xlND1;
         let txtTN = (r.xlTN && r.xlTN !== 'Chưa kiểm tra') ? (r.xlTN + timeStr) : r.xlTN;
         
-        return `<tr class="clickable-row ${trClass}" onclick="editSubject('${r.id}', 'TN', 'thuoc-no')">
+        return `<tr class="${trClass}">
             <td style="font-weight:700;">${idx + 1}</td> <td><strong style="font-size:16px;">${r.ten}</strong></td>
             <td>${r.cb||''}</td>
             <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
@@ -975,12 +907,11 @@ function renderLuuDan(){
     const t=document.getElementById('ld-tbody'); let fRec = getFilteredRecords();
     if(!fRec.length){t.innerHTML='<tr><td colspan="6" class="td-center" style="padding:20px;">Chưa có dữ liệu</td></tr>';return;} 
     
-    // Đã thêm chữ "idx" vào trong map(r, idx)
     t.innerHTML=fRec.map((r, idx) => {
         let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
         let trClass = (typeof lastUpdatedId !== 'undefined' && r.id === lastUpdatedId) ? 'row-updated' : '';
         
-        return `<tr class="clickable-row ${trClass}" onclick="editSubject('${r.id}', 'LD', 'luu-dan')">
+        return `<tr class="${trClass}">
             <td style="font-weight:700;">${idx + 1}</td> <td><strong style="font-size:16px;">${r.ten}</strong></td>
             <td>${r.cb||''}</td>
             <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
@@ -1062,10 +993,7 @@ function renderXepHang(){
         tHead.innerHTML = `<tr><th style="width:60px;">Hạng</th><th style="width:250px;">Họ tên</th><th style="width:120px;">Cấp bậc</th><th>Đơn vị</th><th style="width:200px;" class="td-center">Điểm Thành tích</th><th class="td-center" style="width:140px;">Xếp loại</th></tr>`;
         
         let sorted = [...d].sort((a,b) => {
-            if (subj === 'CHUNG') {
-                // Xếp hạng chung thì dựa vào Tổng điểm BS làm phụ, hoặc chỉ chia nhóm
-                return (b.bsTong || 0) - (a.bsTong || 0);
-            }
+            if (subj === 'CHUNG') return (b.bsTong || 0) - (a.bsTong || 0);
             return (b.bsTong || 0) - (a.bsTong || 0);
         });
         
@@ -1093,9 +1021,11 @@ function renderXepHang(){
         d.forEach(r => {
             let parts = (r.dv || '').split('/'); 
             let uName = "";
-            if(type==='c' && parts[0]) uName = parts[0];
-            else if(type==='b' && parts[1]) uName = parts[0]+'/'+parts[1];
-            else if(type==='a' && parts[2]) uName = parts[0]+'/'+parts[1]+'/'+parts[2];
+            // TV lấy tới 4 cấp: dBB1/I/A/1
+            if(type==='d' && parts[0]) uName = parts[0];
+            else if(type==='c' && parts[1]) uName = parts[0]+'/'+parts[1];
+            else if(type==='b' && parts[2]) uName = parts[0]+'/'+parts[1]+'/'+parts[2];
+            else if(type==='a' && parts[3]) uName = parts.join('/');
 
             if(!uName) return; 
 
@@ -1125,7 +1055,6 @@ function renderXepHang(){
             let revName = g.name.split('/').reverse().join(' / ');
             
             let unitGrade = tinhXepLoaiChungQuyChe(g.total, g.G, g.K, g.D);
-
             let pG = Math.round(g.G/g.total*100) || 0, pK = Math.round(g.K/g.total*100) || 0, pD = Math.round(g.D/g.total*100) || 0, pKD = Math.round(g.KD/g.total*100) || 0;
 
             return `<tr>
