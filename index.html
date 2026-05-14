@@ -409,6 +409,7 @@
 
 <script>
 // ===== CẤU HÌNH SUPABASE GỘP 4 BẢNG =====
+// ===== CẤU HÌNH SUPABASE GỘP 4 BẢNG =====
 const SUPABASE_URL = 'https://tuvxfcgipntxqzsuxrja.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_K6xH0edmwcz2BEsEd6NPSw_O_UXVvY2';
 const dbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -450,10 +451,12 @@ function sortRecordsArray() {
     records.sort((a, b) => {
         let dvA = a.dv || ""; let dvB = b.dv || "";
         if (dvA !== dvB) return dvA.localeCompare(dvB);
+        
         let idA = a.id ? String(a.id) : "";
         let idB = b.id ? String(b.id) : "";
-        let idxA = parseInt(idA.split('_')[1]) || 0;
-        let idxB = parseInt(idB.split('_')[1]) || 0;
+        // ID lúc này có dạng dBB1_1_0_B1, ta lấy phần tử thứ 2 (là vị trí gốc) để sắp xếp
+        let idxA = parseInt(idA.split('_')[2]) || parseInt(idA.split('_')[1]) || 0;
+        let idxB = parseInt(idB.split('_')[2]) || parseInt(idB.split('_')[1]) || 0;
         return idxA - idxB;
     });
 }
@@ -464,9 +467,10 @@ async function loadData() {
         let promises = dsBang.map(item => 
             dbClient.from(item.table).select('*').then(res => {
                 if (res.data) {
-                    // Tự động đóng dấu tên Tiểu đoàn để không bị gộp trùng Đại đội
                     return res.data.map(r => ({
                         ...r,
+                        // BƠM VACCINE: Gắn biển số nhà vào trước ID để miễn nhiễm xung đột
+                        id: item.label + '_' + r.id, 
                         dv: item.label + '/' + (r.dv || 'Khác')
                     }));
                 }
@@ -495,13 +499,16 @@ async function loadData() {
 dsBang.forEach(item => {
     dbClient.channel('kenh-' + item.table)
         .on('postgres_changes', { event: '*', schema: 'public', table: item.table }, payload => {
-            let moi = payload.new;
+            
+            // XỬ LÝ KHI CÓ LỆNH XÓA/CẬP NHẬT TỪ BẤT KỲ TIỂU ĐOÀN NÀO
             if (payload.eventType === 'DELETE') {
-                records = records.filter(r => r.id !== payload.old.id);
-                recentLogs = recentLogs.filter(l => l.rec.id !== payload.old.id);
+                let uniqueId = item.label + '_' + payload.old.id; // Chỉ định xóa đúng người của nhà đó
+                records = records.filter(r => r.id !== uniqueId);
+                recentLogs = recentLogs.filter(l => l.rec.id !== uniqueId);
             } else {
-                // Tự động đóng dấu tên Tiểu đoàn cho dữ liệu vừa nhảy về
-                moi.dv = item.label + '/' + (moi.dv || 'Khác');
+                let moi = payload.new;
+                moi.id = item.label + '_' + moi.id; // Đóng dấu ID
+                moi.dv = item.label + '/' + (moi.dv || 'Khác'); // Đóng dấu Đơn vị
                 
                 let vt = records.findIndex(r => r.id === moi.id);
                 if (vt >= 0) records[vt] = moi; else records.push(moi);
@@ -511,7 +518,6 @@ dsBang.forEach(item => {
                 recentLogs.unshift({ rec: moi, subject: changedSubj, time: moi.updatedAt || Date.now() });
                 let seen = new Set();
                 recentLogs = recentLogs.filter(l => seen.has(l.rec.id) ? false : seen.add(l.rec.id)).slice(0, 10);
-                showToast(`Vừa cập nhật điểm cho: ${moi.ten}`);
             }
             sortRecordsArray();
             refreshAll();
