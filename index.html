@@ -442,27 +442,7 @@ async function loadData() {
     }
 }
 
-loadData();
-
 // Thiết lập Realtime tự nhảy điểm cho cả 4 bảng
-dsBang.forEach(tenBang => {
-    dbClient.channel('kenh-' + tenBang)
-        .on('postgres_changes', { event: '*', schema: 'public', table: tenBang }, payload => {
-            let moi = payload.new;
-            if (payload.eventType === 'DELETE') {
-                records = records.filter(r => r.id !== payload.old.id);
-            } else {
-                let vt = records.findIndex(r => r.id === moi.id);
-                if (vt >= 0) records[vt] = moi; else records.push(moi);
-                lastUpdatedId = moi.id;
-            }
-            refreshAll();
-        }).subscribe();
-});
-
-loadData();
-
-// Thiết lập Realtime cho cả 4 bảng để TV tự nhảy điểm khi có người nhập
 dsBang.forEach(tenBang => {
     dbClient.channel('kenh-' + tenBang)
         .on('postgres_changes', { event: '*', schema: 'public', table: tenBang }, payload => {
