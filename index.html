@@ -408,18 +408,50 @@
 </div>
 
 <script>
-const SUPABASE_URL = "https://tuvxfcgipntxqzsuxrja.supabase.co";
-const SUPABASE_KEY = "sb_publishable_K6xH0edmwcz2BEsEd6NPSw_O_UXVvY2";
+// ===== CẤU HÌNH SUPABASE GỘP 4 BẢNG =====
+const SUPABASE_URL = 'https://tuvxfcgipntxqzsuxrja.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_K6xH0edmwcz2BEsEd6NPSw_O_UXVvY2';
 const dbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// DANH SACH 4 BANG DU LIEU CAN GOP
+let records = [];
+let recentLogs = []; 
+let currentFilter = { dv: 'all' };
+let lastUpdatedId = null; 
+
+// DANH SÁCH 4 BẢNG DỮ LIỆU CẦN GỘP LÊN TV
 const dsBang = ['bang_diem_dbb1', 'bang_diem_dbb2', 'bang_diem_dbb3', 'bang_diem_e142'];
 
-// KHAI BÁO BIẾN TOÀN CỤC
-let records = [];
-let lastUpdatedId = null;
-let recentLogs = [];
-let currentFilter = { dv: 'all' };
+function showToast(msg) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast`;
+    toast.innerHTML = `<span>⚡</span> <span>${msg}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+function guessSubject(r) {
+    if (r.xlTN && r.xlTN !== 'Chưa kiểm tra') return 'TN';
+    if (r.xlLD && r.xlLD !== 'Chưa kiểm tra') return 'LD';
+    if (r.xlBS && r.xlBS !== 'Chưa kiểm tra') return 'BS';
+    return 'BS'; 
+}
+
+function sortRecordsArray() {
+    records.sort((a, b) => {
+        let dvA = a.dv || ""; let dvB = b.dv || "";
+        if (dvA !== dvB) return dvA.localeCompare(dvB);
+        let idA = a.id ? String(a.id) : "";
+        let idB = b.id ? String(b.id) : "";
+        let idxA = parseInt(idA.split('_')[1]) || 0;
+        let idxB = parseInt(idB.split('_')[1]) || 0;
+        return idxA - idxB;
+    });
+}
 
 async function loadData() {
     try {
@@ -431,39 +463,97 @@ async function loadData() {
         ketQua.forEach(kq => {
             if (kq.data) records = records.concat(kq.data);
         });
+        
+        sortRecordsArray(); 
+        
+        let sortedForLogs = [...records].sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0)).slice(0, 10);
+        recentLogs = sortedForLogs.map(r => ({
+            rec: r, subject: guessSubject(r), time: r.updatedAt || 0
+        }));
 
-        // Sắp xếp lại danh sách gộp theo Đơn vị và STT
-        records.sort((a, b) => {
-            let dvA = a.dv || ""; let dvB = b.dv || "";
-            if (dvA !== dvB) return dvA.localeCompare(dvB);
-            let idxA = parseInt(String(a.id).split('_')[1]) || 0;
-            let idxB = parseInt(String(b.id).split('_')[1]) || 0;
-            return idxA - idxB;
-        });
-
-        console.log("Tải thành công quân số: " + records.length);
         refreshAll();
     } catch (error) {
         console.error("Lỗi tải dữ liệu gộp:", error);
     }
 }
 
-// Thiết lập Realtime tự nhảy điểm cho cả 4 bảng
+// Thiết lập Realtime cho cả 4 bảng để tự nhảy điểm
 dsBang.forEach(tenBang => {
     dbClient.channel('kenh-' + tenBang)
         .on('postgres_changes', { event: '*', schema: 'public', table: tenBang }, payload => {
             let moi = payload.new;
             if (payload.eventType === 'DELETE') {
                 records = records.filter(r => r.id !== payload.old.id);
+                recentLogs = recentLogs.filter(log => log.rec.id !== payload.old.id);
             } else {
                 let vt = records.findIndex(r => r.id === moi.id);
                 if (vt >= 0) records[vt] = moi; else records.push(moi);
                 lastUpdatedId = moi.id;
+                
+                let changedSubj = guessSubject(moi);
+                recentLogs.unshift({ rec: moi, subject: changedSubj, time: moi.updatedAt || Date.now() });
+                
+                let seen = new Set();
+                recentLogs = recentLogs.filter(l => seen.has(l.rec.id) ? false : seen.add(l.rec.id)).slice(0, 10);
             }
+            sortRecordsArray();
             refreshAll();
+
+            if (lastUpdatedId) {
+                setTimeout(() => {
+                    lastUpdatedId = null;
+                    renderMainTable(); renderBanSung(); renderThuocNo(); renderLuuDan(); renderKetQua();
+                }, 3000);
+            }
         }).subscribe();
 });
 
+loadData();
+
+// ================== HÀM VẼ BẢNG LIVE (ĐÃ FIX LỖI CRASH VÀ GIỮ NGUYÊN LỆNH REVERSE) ==================
+
+function renderMainTable() {
+  const tbody = document.getElementById('main-tbody'); 
+  if(!tbody) return;
+  let fRecords = getFilteredRecords();
+  let filteredLogs = recentLogs.filter(log => fRecords.some(r => r.id === log.rec.id));
+  
+  if(!filteredLogs.length){
+      tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text2);font-style:italic;">Chưa có dữ liệu mới</td></tr>';
+      return;
+  }
+  
+  // Đã thêm idx để hết lỗi trắng trang
+  tbody.innerHTML = filteredLogs.map((log, idx) => {
+      let r = log.rec;
+      // VẪN GIỮ NGUYÊN .reverse() ĐỂ HIỆN CHUẨN: Tiểu đội / Trung đội / Đại đội
+      let dvReversed = (r.dv || '').split('/').reverse().filter(Boolean).join(' / ');
+      let trClass = r.id === lastUpdatedId ? 'row-updated' : '';
+
+      let cols = '';
+      if (log.subject === 'BS') {
+          cols = `<td class="td-center"><strong style="color:var(--accent); font-size:14px;">BẮN SÚNG</strong></td>
+                  <td class="td-center" style="width:120px;">Điểm: <strong style="font-size:16px;">${r.bsTong!=null?r.bsTong:'-'}</strong></td>
+                  <td class="td-center" colspan="2">XL: ${xlPill(r.xlBS)}</td>`;
+      } else if (log.subject === 'TN') {
+          cols = `<td class="td-center"><strong style="color:var(--gold); font-size:14px;">THUỐC NỔ</strong></td>
+                  <td class="td-center" style="width:110px;">ND1: ${xlPill(r.xlND1)}</td>
+                  <td class="td-center" style="width:110px;">ND2: ${xlPill(r.xlND2)}</td>
+                  <td class="td-center" style="width:110px;">Tổng: ${xlPill(r.xlTN)}</td>`;
+      } else {
+          cols = `<td class="td-center"><strong style="color:var(--accent3); font-size:14px;">LỰU ĐẠN</strong></td>
+                  <td class="td-center" colspan="3">Xếp loại: ${xlPill(r.xlLD)}</td>`;
+      }
+
+      return `<tr class="${trClass}">
+                <td>${idx + 1}</td>
+                <td><strong style="color:var(--text); font-size: 16px;">${r.ten}</strong></td>
+                <td>${r.cb||''}</td>
+                <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
+                ${cols}
+              </tr>`;
+  }).join('');
+}
 dbClient.channel('tv-channel')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bang_diem_e142' }, payload => {
         
@@ -661,34 +751,6 @@ function formatTime(tg) {
     let s_str = s < 10 ? '0' + s : s;
     return `: ${m_str}'${s_str}"`;
 }
-function showToast(msg) {
-    const c = document.getElementById('toast-container');
-    if (!c) return;
-    const t = document.createElement('div');
-    t.className = 'toast';
-    t.textContent = msg;
-    c.appendChild(t);
-    setTimeout(() => t.classList.add('show'), 10);
-    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 3500);
-}
-
-function guessSubject(rec) {
-    if (rec.xlBS && rec.xlBS !== 'Chưa kiểm tra') return 'BS';
-    if (rec.xlTN && rec.xlTN !== 'Chưa kiểm tra') return 'TN';
-    if (rec.xlLD && rec.xlLD !== 'Chưa kiểm tra') return 'LD';
-    return 'BS';
-}
-
-function sortRecordsArray() {
-    records.sort((a, b) => {
-        let dvA = a.dv || ""; let dvB = b.dv || "";
-        if (dvA !== dvB) return dvA.localeCompare(dvB);
-        let idxA = parseInt(String(a.id).split('_')[1]) || 0;
-        let idxB = parseInt(String(b.id).split('_')[1]) || 0;
-        return idxA - idxB;
-    });
-}
-
 function refreshAll() {
   // Sắp xếp tương tự index.html
   records.sort((a, b) => {
