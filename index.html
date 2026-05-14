@@ -415,6 +415,12 @@ const dbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // DANH SACH 4 BANG DU LIEU CAN GOP
 const dsBang = ['bang_diem_dbb1', 'bang_diem_dbb2', 'bang_diem_dbb3', 'bang_diem_e142'];
 
+// KHAI BÁO BIẾN TOÀN CỤC
+let records = [];
+let lastUpdatedId = null;
+let recentLogs = [];
+let currentFilter = { dv: 'all' };
+
 async function loadData() {
     try {
         console.log("Đang tải dữ liệu tổng hợp từ 4 bảng...");
@@ -655,6 +661,34 @@ function formatTime(tg) {
     let s_str = s < 10 ? '0' + s : s;
     return `: ${m_str}'${s_str}"`;
 }
+function showToast(msg) {
+    const c = document.getElementById('toast-container');
+    if (!c) return;
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.classList.add('show'), 10);
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 3500);
+}
+
+function guessSubject(rec) {
+    if (rec.xlBS && rec.xlBS !== 'Chưa kiểm tra') return 'BS';
+    if (rec.xlTN && rec.xlTN !== 'Chưa kiểm tra') return 'TN';
+    if (rec.xlLD && rec.xlLD !== 'Chưa kiểm tra') return 'LD';
+    return 'BS';
+}
+
+function sortRecordsArray() {
+    records.sort((a, b) => {
+        let dvA = a.dv || ""; let dvB = b.dv || "";
+        if (dvA !== dvB) return dvA.localeCompare(dvB);
+        let idxA = parseInt(String(a.id).split('_')[1]) || 0;
+        let idxB = parseInt(String(b.id).split('_')[1]) || 0;
+        return idxA - idxB;
+    });
+}
+
 function refreshAll() {
   // Sắp xếp tương tự index.html
   records.sort((a, b) => {
