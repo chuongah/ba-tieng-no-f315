@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TRỰC TIẾP: HỆ THỐNG QUẢN LÝ KẾT QUẢ KIỂM TRA 3 TIẾNG NỔ</title>
+<title>PHẦN MỀM QUẢN LÝ KẾT QUẢ KIỂM TRA 3 TIẾNG NỔ CSM</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
@@ -190,7 +190,7 @@
 
 <div class="nav">
   <div class="nav-item active" onclick="showPage('tong-hop')" data-page="tong-hop">📊 Tổng hợp Đơn vị</div>
-  <div class="nav-item" onclick="showPage('ket-qua')" data-page="ket-qua">📝 Danh sách Kết quả</div>
+  <div class="nav-item" onclick="showPage('ket-qua')" data-page="ket-qua">Kết quả 3 môn</div>
   <div class="nav-item" onclick="showPage('ban-sung')" data-page="ban-sung">Bắn súng TLAK</div>
   <div class="nav-item" onclick="showPage('thuoc-no')" data-page="thuoc-no">Thuốc nổ</div>
   <div class="nav-item" onclick="showPage('luu-dan')" data-page="luu-dan">Lựu đạn</div>
@@ -853,12 +853,16 @@ function renderKetQua() {
         let xlChung = xlChungCaNhan(r.xlBS, r.xlTN, r.xlLD);
         let trClass = r.id === lastUpdatedId ? 'row-updated' : '';
 
+        // ĐOẠN ĐÃ SỬA: Lấy thời gian và ghép nối với chữ Giỏi/Khá/Đạt
+        let timeStr = formatTime(r.tnNd1Tg);
+        let txtTN = (r.xlTN && r.xlTN !== 'Chưa kiểm tra') ? (r.xlTN + timeStr) : r.xlTN;
+
         return `<tr class="${trClass}">
             <td style="font-weight:700; color:var(--text2);">${idx + 1}</td> <td><strong style="font-size:16px; color:var(--text);">${r.ten}</strong></td>
             <td style="font-size:13px;">${cbcv}</td>
             <td style="font-size:13px; color:var(--text2);">${dvReversed}</td>
             <td class="td-center">${xlPill(r.xlBS)}</td>
-            <td class="td-center">${xlPill(r.xlTN, formatTime(r.tnNd1Tg))}</td>
+            <td class="td-center">${xlPill(r.xlTN, txtTN)}</td> 
             <td class="td-center">${xlPill(r.xlLD)}</td>
             <td class="td-center" style="background:#f5f8ff;">${xlPill(xlChung)}</td>
         </tr>`;
