@@ -164,11 +164,44 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
   ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+  /* SIDEBAR TOGGLE BUTTON */
+  .sidebar-toggle-btn {
+    position: fixed; bottom: 20px; left: 20px; z-index: 1000;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(37,99,235,0.4); transition: background 0.2s, transform 0.2s;
+  }
+  .sidebar-toggle-btn:hover { background: #1d4ed8; transform: scale(1.08); }
+
+  /* SIDEBAR ẨN/HIỆN */
+  .sidebar { transition: width 0.25s ease, min-width 0.25s ease, padding 0.25s ease, opacity 0.25s ease; overflow: hidden; }
+  .sidebar.collapsed { width: 0 !important; min-width: 0 !important; padding: 0 !important; opacity: 0; border: none; }
+
+  /* TABLE SWIPE WRAPPER — cho phép vuốt ngang trên mobile */
+  .table-scroll-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-scroll-wrap table { min-width: 600px; }
+
+  @media (max-width: 768px) {
+    .sidebar { width: 200px; min-width: 200px; }
+    .header-top { padding: 8px 12px; flex-wrap: wrap; gap: 8px; }
+    .app-title h1 { font-size: 14px; }
+    .nav { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 0 4px; flex-wrap: nowrap; }
+    .nav-item { font-size: 13px; padding: 12px 10px; white-space: nowrap; }
+    .main { padding: 12px; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .sidebar-toggle-btn { bottom: 16px; left: 16px; }
+  }
 </style>
 </head>
 <body>
 
 <div id="toast-container"></div>
+<button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Ẩn/hiện bộ lọc">☰</button>
 
 <div class="header">
   <div class="header-top">
@@ -313,6 +346,7 @@
     <div class="page" id="page-ket-qua">
       <div class="section-title">📝 Danh sách Kết quả 3 môn tiếng nổ</div>
       <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
+        <div class="table-scroll-wrap">
         <table>
           <thead>
             <tr>
@@ -328,12 +362,14 @@
           </thead>
           <tbody id="kq-tbody"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
     <div class="page" id="page-ban-sung">
       <div class="section-title">Kết quả kiểm tra</div>
       <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
+        <div class="table-scroll-wrap">
         <table>
           <thead>
             <tr>
@@ -350,26 +386,31 @@
           </thead>
           <tbody id="bs-tbody"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
     <div class="page" id="page-thuoc-no">
       <div class="section-title">Kết quả kiểm tra</div>
       <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
+        <div class="table-scroll-wrap">
         <table>
-          <thead><tr><th style="width:40px;">TT</th><th style="width:250px;">Họ tên</th><th>CB/CV</th><th>Đơn vị</th><th class="td-center">XL ND1</th><th class="td-center">XL ND2</th><th class="td-center">XL Tổng</th></tr></thead>
+        <thead><tr><th style="width:40px;">TT</th><th style="width:250px;">Họ tên</th><th>CB/CV</th><th>Đơn vị</th><th class="td-center">XL ND1</th><th class="td-center">XL ND2</th><th class="td-center">XL Tổng</th></tr></thead>
           <tbody id="tn-tbody"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
     <div class="page" id="page-luu-dan">
       <div class="section-title">Kết quả kiểm tra</div>
       <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
+        <div class="table-scroll-wrap">
         <table>
           <thead><tr><th style="width:40px;">TT</th><th style="width:250px;">Họ tên</th><th>CB/CV</th><th>Đơn vị</th><th class="td-center">Kết quả vòng</th><th class="td-center">Xếp loại</th></tr></thead>
           <tbody id="ld-tbody"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
@@ -397,10 +438,12 @@
         </div>
       </div>
       <div class="table-wrap" style="max-height: calc(100vh - 120px); overflow-y:auto;">
+        <div class="table-scroll-wrap">
           <table id="rank-table">
             <thead id="xh-thead"></thead>
             <tbody id="xh-tbody"></tbody>
           </table>
+        </div>
       </div>
     </div>
 
@@ -448,16 +491,20 @@ function guessSubject(r) {
 }
 
 function sortRecordsArray() {
+    // Giữ nguyên thứ tự nhập liệu gốc từng tiểu đoàn
+    // Chỉ sort theo tiểu đoàn (prefix dBB1/dBB2...) rồi theo vị trí gốc trong file
+    // KHÔNG sort lẫn lộn chiến sĩ giữa các đơn vị con
     records.sort((a, b) => {
-        let dvA = a.dv || ""; let dvB = b.dv || "";
-        if (dvA !== dvB) return dvA.localeCompare(dvB);
-        
-        let idA = a.id ? String(a.id) : "";
-        let idB = b.id ? String(b.id) : "";
-        // ID lúc này có dạng dBB1_1_0_B1, ta lấy phần tử thứ 2 (là vị trí gốc) để sắp xếp
-        let idxA = parseInt(idA.split('_')[2]) || parseInt(idA.split('_')[1]) || 0;
-        let idxB = parseInt(idB.split('_')[2]) || parseInt(idB.split('_')[1]) || 0;
-        return idxA - idxB;
+        let idA = String(a.id || '');
+        let idB = String(b.id || '');
+        // Lấy prefix tiểu đoàn (dBB1, dBB2...) để nhóm các tiểu đoàn lại với nhau
+        let prefA = idA.split('_')[0] || '';
+        let prefB = idB.split('_')[0] || '';
+        if (prefA !== prefB) return prefA.localeCompare(prefB);
+        // Trong cùng tiểu đoàn: giữ thứ tự gốc theo id (vị trí trong file Excel)
+        let nA = parseInt(idA.split('_')[2]) || parseInt(idA.split('_')[1]) || 0;
+        let nB = parseInt(idB.split('_')[2]) || parseInt(idB.split('_')[1]) || 0;
+        return nA - nB;
     });
 }
 
@@ -523,6 +570,11 @@ dsBang.forEach(item => {
             refreshAll();
 
             if (lastUpdatedId) {
+                // AUTO-SCROLL: đưa hàng vừa cập nhật vào tầm nhìn, chỉ khi đang ở đúng tab liên quan
+                setTimeout(() => {
+                    scrollToUpdatedRow(lastUpdatedId);
+                }, 150); // Chờ DOM render xong
+
                 setTimeout(() => {
                     lastUpdatedId = null;
                     renderMainTable(); renderBanSung(); renderThuocNo(); renderLuuDan(); renderKetQua();
@@ -1101,6 +1153,49 @@ function showPage(id){
     if(id==='thuoc-no') renderThuocNo();
     if(id==='luu-dan') renderLuuDan();
     if(id==='ket-qua') renderKetQua();
+}
+
+// AUTO-SCROLL đến hàng vừa cập nhật trên màn hình HDMI
+// Chỉ scroll nếu đang ở đúng tab chứa dữ liệu vừa nhập, không nhảy tab
+function scrollToUpdatedRow(updatedId) {
+    if (!updatedId) return;
+
+    // Map: tên page -> tbody id tương ứng
+    const pageBodyMap = [
+        { pageId: 'ket-qua',  tbodyId: 'kq-tbody' },
+        { pageId: 'ban-sung', tbodyId: 'bs-tbody' },
+        { pageId: 'thuoc-no', tbodyId: 'tn-tbody' },
+        { pageId: 'luu-dan',  tbodyId: 'ld-tbody' },
+    ];
+
+    // Tìm page đang active
+    let activePage = null;
+    pageBodyMap.forEach(m => {
+        if (document.getElementById('page-' + m.pageId)?.classList.contains('active')) {
+            activePage = m;
+        }
+    });
+
+    if (!activePage) return; // Đang ở tab Tổng hợp, Xếp hạng... → không làm gì
+
+    // Tìm hàng có row-updated trong tbody đang hiển thị
+    const tbody = document.getElementById(activePage.tbodyId);
+    if (!tbody) return;
+
+    // Tìm tr có class row-updated (được gán khi render với lastUpdatedId)
+    const updatedRow = tbody.querySelector('tr.row-updated');
+    if (!updatedRow) return;
+
+    // Scroll hàng đó vào giữa vùng nhìn thấy
+    updatedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function toggleSidebar() {
+    const sb = document.querySelector('.sidebar');
+    const btn = document.getElementById('sidebar-toggle-btn');
+    const isCollapsed = sb.classList.toggle('collapsed');
+    btn.textContent = isCollapsed ? '▶' : '☰';
+    btn.title = isCollapsed ? 'Hiện bộ lọc' : 'Ẩn bộ lọc';
 }
 </script>
 </body>
